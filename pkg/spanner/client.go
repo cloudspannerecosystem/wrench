@@ -155,9 +155,8 @@ func (c *Client) ApplyDMLFile(ctx context.Context, ddl []byte, partitioned bool)
 
 	if partitioned {
 		return c.ApplyPartitionedDML(ctx, statements)
-	} else {
-		return c.ApplyDML(ctx, statements)
 	}
+	return c.ApplyDML(ctx, statements)
 }
 
 func (c *Client) ApplyDML(ctx context.Context, statements []string) (int64, error) {

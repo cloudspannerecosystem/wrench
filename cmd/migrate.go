@@ -150,11 +150,10 @@ func migrateVersion(c *cobra.Command, args []string) error {
 		if xerrors.As(err, &se) && se.Code == spanner.ErrorCodeNoMigration {
 			fmt.Println("No migrations.")
 			return nil
-		} else {
-			return &Error{
-				cmd: c,
-				err: err,
-			}
+		}
+		return &Error{
+			cmd: c,
+			err: err,
 		}
 	}
 
