@@ -94,7 +94,7 @@ This loads schema DDL from database and writes it to `./_examples/schema.sql`.
 $ wrench migrate create --directory ./_examples
 ```
 
-This creates a next migration file like `_examples/migrations/000001.sql`. You will wirte your own migration DDL to this file.
+This creates a next migration file like `_examples/migrations/000001.sql`. You will write your own migration DDL to this file.
 
 ### Execute migrations
 
