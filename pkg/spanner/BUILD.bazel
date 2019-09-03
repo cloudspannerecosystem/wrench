@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "client.go",
+        "config.go",
+        "errors.go",
+        "migration.go",
+    ],
+    importpath = "github.com/mercari/wrench/pkg/spanner",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_google_cloud_go//spanner:go_default_library",
+        "@com_google_cloud_go//spanner/admin/database/apiv1:go_default_library",
+        "@go_googleapis//google/spanner/admin/database/v1:database_go_proto",
+        "@org_golang_google_api//iterator:go_default_library",
+        "@org_golang_google_api//option:go_default_library",
+        "@org_golang_google_grpc//status:go_default_library",
+        "@org_golang_x_xerrors//:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "client_test.go",
+        "migration_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
+    deps = [
+        "@com_google_cloud_go//spanner:go_default_library",
+        "@org_golang_google_api//iterator:go_default_library",
+    ],
+)

@@ -1,0 +1,4 @@
+CREATE TABLE Singers (
+  SingerID STRING(36) NOT NULL,
+  FirstName STRING(1024),
+) PRIMARY KEY(SingerID);
