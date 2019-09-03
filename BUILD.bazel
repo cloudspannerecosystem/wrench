@@ -3,6 +3,7 @@ version = "1.0.0"
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
+load("@io_bazel_rules_docker//container:container.bzl", "container_push")
 
 # gazelle:prefix github.com/mercari/wrench
 gazelle(name = "gazelle")
@@ -29,4 +30,13 @@ go_binary(
 go_image(
     name = "image",
     embed = [":go_default_library"],
+)
+
+container_push(
+    name = "registry",
+    format = "Docker",
+    image = ":image",
+    registry = "index.docker.io",
+    repository = "mercari/wrench",
+    tag = version,
 )

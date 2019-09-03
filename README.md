@@ -42,7 +42,8 @@ CREATE TABLE Singers (
 
 ## Installation
 
-Get binary from releases page.
+Get binary from [release page](https://github.com/mercari/wrench/releases).
+Or, you can use Docker container: [mercari/wrench](https://hub.docker.com/r/mercari/wrench).
 
 ## Usage
 
