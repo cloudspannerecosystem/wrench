@@ -1,12 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/mercari/wrench/cmd"
 	"github.com/mercari/wrench/pkg/spanner"
-	"golang.org/x/xerrors"
 )
 
 func main() {
@@ -25,8 +25,8 @@ func handleError(err error) {
 }
 
 func errorDetails(err error) string {
-	se := &spanner.Error{}
-	if xerrors.As(err, &se) {
+	var se *spanner.Error
+	if errors.As(err, &se) {
 		switch se.Code {
 		case spanner.ErrorCodeCreateClient:
 			return fmt.Sprintf("Failed to connect to Cloud Spanner, %s", se.Error())
@@ -37,12 +37,12 @@ func errorDetails(err error) string {
 		}
 	}
 
-	pe := &os.PathError{}
-	if xerrors.As(err, &pe) {
+	var pe *os.PathError
+	if errors.As(err, &pe) {
 		return fmt.Sprintf("Invalid file path, %s", pe.Error())
 	}
 
-	if err := xerrors.Unwrap(err); err != nil {
+	if err := errors.Unwrap(err); err != nil {
 		return fmt.Sprintf("%s", err.Error())
 	}
 

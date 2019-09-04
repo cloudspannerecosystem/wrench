@@ -17,7 +17,6 @@ go_library(
         "@org_golang_google_api//iterator:go_default_library",
         "@org_golang_google_api//option:go_default_library",
         "@org_golang_google_grpc//status:go_default_library",
-        "@org_golang_x_xerrors//:go_default_library",
     ],
 )
 

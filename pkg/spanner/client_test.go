@@ -3,9 +3,8 @@ package spanner
 import (
 	"context"
 	"io/ioutil"
-	"testing"
-
 	"os"
+	"testing"
 
 	"cloud.google.com/go/spanner"
 	"google.golang.org/api/iterator"

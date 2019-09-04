@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//pkg/spanner:go_default_library",
         "@com_github_spf13_cobra//:go_default_library",
-        "@org_golang_x_xerrors//:go_default_library",
     ],
 )
 

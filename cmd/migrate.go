@@ -11,7 +11,6 @@ import (
 
 	"github.com/mercari/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
-	"golang.org/x/xerrors"
 )
 
 const (
@@ -146,8 +145,8 @@ func migrateVersion(c *cobra.Command, args []string) error {
 
 	v, _, err := client.GetSchemaMigrationVersion(ctx, migrationTableName)
 	if err != nil {
-		se := &spanner.Error{}
-		if xerrors.As(err, &se) && se.Code == spanner.ErrorCodeNoMigration {
+		var se *spanner.Error
+		if errors.As(err, &se) && se.Code == spanner.ErrorCodeNoMigration {
 			fmt.Println("No migrations.")
 			return nil
 		}
