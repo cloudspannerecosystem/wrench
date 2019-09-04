@@ -296,36 +296,32 @@ func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string
 	iter := c.spannerClient.Single().Query(ctx, stmt)
 	defer iter.Stop()
 
-	for {
-		row, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
+	row, err := iter.Next()
+	if err != nil {
+		if err == iterator.Done {
 			return 0, false, &Error{
-				Code: ErrorCodeGetMigrationVersion,
-				err:  err,
+				Code: ErrorCodeNoMigration,
+				err:  errors.New("No migration."),
 			}
 		}
-
-		var (
-			v     int64
-			dirty bool
-		)
-		if err := row.Columns(&v, &dirty); err != nil {
-			return 0, false, &Error{
-				Code: ErrorCodeGetMigrationVersion,
-				err:  err,
-			}
+		return 0, false, &Error{
+			Code: ErrorCodeGetMigrationVersion,
+			err:  err,
 		}
-
-		return uint(v), dirty, nil
 	}
 
-	return 0, false, &Error{
-		Code: ErrorCodeNoMigration,
-		err:  errors.New("No migration."),
+	var (
+		v     int64
+		dirty bool
+	)
+	if err := row.Columns(&v, &dirty); err != nil {
+		return 0, false, &Error{
+			Code: ErrorCodeGetMigrationVersion,
+			err:  err,
+		}
 	}
+
+	return uint(v), dirty, nil
 }
 
 func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, dirty bool, tableName string) error {
