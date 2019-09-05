@@ -43,7 +43,7 @@ func errorDetails(err error) string {
 	}
 
 	if err := errors.Unwrap(err); err != nil {
-		return fmt.Sprintf("%s", err.Error())
+		return err.Error()
 	}
 
 	return "Unknown error..."
