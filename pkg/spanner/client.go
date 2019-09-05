@@ -8,7 +8,6 @@ import (
 
 	"cloud.google.com/go/spanner"
 	admin "cloud.google.com/go/spanner/admin/database/apiv1"
-	"golang.org/x/xerrors"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	databasepb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
@@ -208,8 +207,8 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 
 	version, dirty, err := c.GetSchemaMigrationVersion(ctx, tableName)
 	if err != nil {
-		se := &Error{}
-		if !xerrors.As(err, &se) || se.Code != ErrorCodeNoMigration {
+		var se *Error
+		if !errors.As(err, &se) || se.Code != ErrorCodeNoMigration {
 			return &Error{
 				Code: ErrorCodeExecuteMigrations,
 				err:  err,
@@ -332,7 +331,8 @@ func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, di
 				tableName,
 				[]string{"Version", "Dirty"},
 				[]interface{}{int64(version), dirty},
-			)}
+			),
+		}
 		return tx.BufferWrite(m)
 	})
 	if err != nil {

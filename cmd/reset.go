@@ -1,8 +1,9 @@
 package cmd
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
-	"golang.org/x/xerrors"
 )
 
 var resetCmd = &cobra.Command{
@@ -24,7 +25,7 @@ func reset(c *cobra.Command, args []string) error {
 }
 
 func errorReset(c *cobra.Command, err error) error {
-	if ue := xerrors.Unwrap(err); ue != nil {
+	if ue := errors.Unwrap(err); ue != nil {
 		return &Error{
 			cmd: c,
 			err: ue,
