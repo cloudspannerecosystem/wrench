@@ -2,6 +2,9 @@
 
 `wrench` is a schema management tool for [Cloud Spanner](https://cloud.google.com/spanner/).
 
+Please feel free to report issues and send pull requests, but note that this
+application is not officially supported as part of the Cloud Spanner product.
+
 ```sh
 $ cat ./_examples/schema.sql
 CREATE TABLE Singers (
@@ -116,13 +119,10 @@ This applies single DDL or DML.
 Use `wrench [command] --help` for more information about a command.
 
 
-## Contribution
+## Contributions
 
-Please read the CLA carefully before submitting your contribution to Mercari.
-Under any circumstances, by submitting your contribution, you are deemed to accept and agree to be bound by the terms and conditions of the CLA.
-
-[https://www.mercari.com/cla/](https://www.mercari.com/cla/)
-
+Please read the [contribution guidelines](CONTRIBUTING.MD) before submitting
+pull requests.
 
 ## License
 
