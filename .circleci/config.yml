@@ -1,0 +1,38 @@
+# Golang CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-go/ for more details
+version: 2
+jobs:
+  build_and_test:
+    docker:
+      - image: circleci/golang:1.13
+
+    working_directory: /go/src/github.com/cloudspannerecosystem/wrench
+
+    steps:
+      - checkout
+
+      - run:
+          name: set credentials
+          command: |
+            echo $GCLOUD_SERVICE_KEY > $HOME/gcloud-service-key.json
+            echo 'export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcloud-service-key.json' >> $BASH_ENV
+      - run: go test -v ./...
+
+workflows:
+  version: 2
+
+  commit:  # Run on every commit.
+    jobs:
+      - build_and_test
+
+  nightly:  # Run every night.
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                  - master
+    jobs:
+      - build_and_test
