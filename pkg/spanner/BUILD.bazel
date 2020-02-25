@@ -8,7 +8,7 @@ go_library(
         "errors.go",
         "migration.go",
     ],
-    importpath = "github.com/mercari/wrench/pkg/spanner",
+    importpath = "github.com/cloudspannerecosystem/wrench/pkg/spanner",
     visibility = ["//visibility:public"],
     deps = [
         "@com_google_cloud_go//spanner:go_default_library",

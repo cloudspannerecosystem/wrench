@@ -5,7 +5,7 @@ load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_push")
 
-# gazelle:prefix github.com/mercari/wrench
+# gazelle:prefix github.com/cloudspannerecosystem/wrench
 gazelle(name = "gazelle")
 
 nogo(
@@ -24,9 +24,9 @@ nogo(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
-    importpath = "github.com/mercari/wrench",
+    importpath = "github.com/cloudspannerecosystem/wrench",
     visibility = ["//visibility:private"],
-    x_defs = {"github.com/mercari/wrench/cmd.Version": version},
+    x_defs = {"github.com/cloudspannerecosystem/wrench/cmd.Version": version},
     deps = [
         "//cmd:go_default_library",
         "//pkg/spanner:go_default_library",

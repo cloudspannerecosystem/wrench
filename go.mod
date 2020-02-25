@@ -1,4 +1,4 @@
-module github.com/mercari/wrench
+module github.com/cloudspannerecosystem/wrench
 
 require (
 	cloud.google.com/go v0.41.0
