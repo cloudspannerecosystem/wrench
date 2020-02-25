@@ -23,7 +23,7 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/mercari/wrench/pkg/spanner"
+	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
 )
 

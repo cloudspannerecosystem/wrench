@@ -13,7 +13,7 @@ go_library(
         "reset.go",
         "root.go",
     ],
-    importpath = "github.com/mercari/wrench/cmd",
+    importpath = "github.com/cloudspannerecosystem/wrench/cmd",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/spanner:go_default_library",
