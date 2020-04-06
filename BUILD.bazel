@@ -42,6 +42,7 @@ go_binary(
 go_image(
     name = "image",
     embed = [":go_default_library"],
+    pure = "on",
 )
 
 container_push(
