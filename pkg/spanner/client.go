@@ -36,6 +36,10 @@ const (
 	ddlStatementsSeparator = ";"
 )
 
+type table struct {
+	TableName string `spanner:"table_name"`
+}
+
 type Client struct {
 	config             *Config
 	spannerClient      *spanner.Client
@@ -106,6 +110,45 @@ func (c *Client) DropDatabase(ctx context.Context) error {
 	if err := c.spannerAdminClient.DropDatabase(ctx, req); err != nil {
 		return &Error{
 			Code: ErrorCodeDropDatabase,
+			err:  err,
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) TruncateAllTables(ctx context.Context) error {
+	var m []*spanner.Mutation
+
+	ri := c.spannerClient.Single().Query(ctx, spanner.Statement{
+		SQL: "SELECT table_name FROM information_schema.tables WHERE table_catalog = '' AND table_schema = ''",
+	})
+	err := ri.Do(func(row *spanner.Row) error {
+		t := &table{}
+		if err := row.ToStruct(t); err != nil {
+			return err
+		}
+
+		if t.TableName == "SchemaMigrations" {
+			return nil
+		}
+
+		m = append(m, spanner.Delete(t.TableName, spanner.AllKeys()))
+		return nil
+	})
+	if err != nil {
+		return &Error{
+			Code: ErrorCodeTruncateAllTables,
+			err:  err,
+		}
+	}
+
+	_, err = c.spannerClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		return txn.BufferWrite(m)
+	})
+	if err != nil {
+		return &Error{
+			Code: ErrorCodeTruncateAllTables,
 			err:  err,
 		}
 	}

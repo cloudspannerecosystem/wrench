@@ -17,39 +17,36 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-package spanner
+package cmd
 
-import "google.golang.org/grpc/status"
+import (
+	"context"
 
-type ErrorCode int
-
-const (
-	ErrorCodeCreateClient = iota + 1
-	ErrorCodeCloseClient
-	ErrorCodeCreateDatabase
-	ErrorCodeDropDatabase
-	ErrorCodeTruncateAllTables
-	ErrorCodeLoadSchema
-	ErrorCodeUpdateDDL
-	ErrorCodeUpdateDML
-	ErrorCodeUpdatePartitionedDML
-	ErrorCodeExecuteMigrations
-	ErrorCodeGetMigrationVersion
-	ErrorCodeSetMigrationVersion
-	ErrorCodeNoMigration
-	ErrorCodeMigrationVersionDirty
-	ErrorCodeWaitOperation
+	"github.com/spf13/cobra"
 )
 
-type Error struct {
-	Code ErrorCode
-	err  error
+var truncateCmd = &cobra.Command{
+	Use:   "truncate",
+	Short: "Truncate all tables without deleting a database",
+	RunE:  truncate,
 }
 
-func (e *Error) Error() string {
-	if st, ok := status.FromError(e.err); ok {
-		return st.Message()
+func truncate(c *cobra.Command, _ []string) error {
+	ctx := context.Background()
+
+	client, err := newSpannerClient(ctx, c)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	err = client.TruncateAllTables(ctx)
+	if err != nil {
+		return &Error{
+			err: err,
+			cmd: c,
+		}
 	}
 
-	return e.err.Error()
+	return nil
 }

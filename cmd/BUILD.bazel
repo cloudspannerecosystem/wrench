@@ -12,6 +12,7 @@ go_library(
         "migrate.go",
         "reset.go",
         "root.go",
+        "truncate.go",
     ],
     importpath = "github.com/cloudspannerecosystem/wrench/cmd",
     visibility = ["//visibility:public"],

@@ -35,10 +35,6 @@ const (
 )
 
 type (
-	table struct {
-		TableName string `spanner:"table_name"`
-	}
-
 	column struct {
 		ColumnName  string `spanner:"column_name"`
 		SpannerType string `spanner:"spanner_type"`
