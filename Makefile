@@ -19,7 +19,8 @@ dep: bin/bazelisk
 	bin/bazelisk run //:gazelle -- \
 		update-repos \
 		-from_file go.mod \
-		-to_macro bazel/deps.bzl%wrench_deps
+		-to_macro bazel/deps.bzl%wrench_deps \
+		-prune
 
 .PHONY: build
 build: bin/bazelisk

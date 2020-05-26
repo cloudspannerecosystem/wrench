@@ -3,7 +3,7 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 http_archive(
     name = "io_bazel_rules_go",
-    urls = ["https://github.com/bazelbuild/rules_go/releases/download/v0.20.2/rules_go-v0.20.2.tar.gz"],
+    urls = ["https://github.com/bazelbuild/rules_go/releases/download/v0.23.1/rules_go-v0.23.1.tar.gz"],
 )
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
@@ -11,13 +11,13 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_depe
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.13.4",
+    go_version = "1.14.3",
     nogo = "@//:nogo",
 )
 
 http_archive(
     name = "bazel_gazelle",
-    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.1/bazel-gazelle-v0.19.1.tar.gz"],
+    urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.21.0/bazel-gazelle-v0.21.0.tar.gz"],
 )
 
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
@@ -34,10 +34,6 @@ git_repository(
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
 protobuf_deps()
-
-load("//:bazel/deps.bzl", "wrench_deps")
-
-wrench_deps()
 
 http_archive(
     name = "io_bazel_rules_docker",
@@ -58,3 +54,8 @@ load(
 )
 
 _go_image_repos()
+
+load("//:bazel/deps.bzl", "wrench_deps")
+
+# gazelle:repository_macro bazel/deps.bzl%wrench_deps
+wrench_deps()
