@@ -21,11 +21,13 @@ package spanner
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
 	"cloud.google.com/go/spanner"
+	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
 )
 
@@ -399,7 +401,8 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 	// TODO: take random database name and run tests parallelly.
 	database := os.Getenv(envSpannerDatabaseID)
 	if database == "" {
-		t.Fatalf("must set %s", envSpannerDatabaseID)
+		id := uuid.New()
+		database = fmt.Sprintf("wrench-test-%s", id.String()[:8])
 	}
 
 	config := &Config{
