@@ -30,18 +30,34 @@ $ wrench migrate up --directory ./_examples
 # load ddl from database to file ./_examples/schema.sql
 $ wrench load --directory ./_examples
 
+# show time and date of migrations
+$ wrench migrate history
+Version	Dirty	Created					Modified
+1	false	2020-06-16 08:07:11.763755 +0000 UTC	2020-06-16 08:07:11.76998 +0000 UTC
+
 # finally, we have successfully migrated database!
 $ cat ./_examples/schema.sql
-CREATE TABLE SchemaMigrations (
-  Version INT64 NOT NULL,
-  Dirty BOOL NOT NULL,
-) PRIMARY KEY(Version);
-
 CREATE TABLE Singers (
   SingerID STRING(36) NOT NULL,
   FirstName STRING(1024),
   LastName STRING(1024),
 ) PRIMARY KEY(SingerID);
+
+CREATE TABLE SchemaMigrations (
+  Version INT64 NOT NULL,
+  Dirty BOOL NOT NULL,
+) PRIMARY KEY(Version);
+
+CREATE TABLE SchemaMigrationsHistory (
+  Version INT64 NOT NULL,
+  Dirty BOOL NOT NULL,
+  Created TIMESTAMP NOT NULL OPTIONS (
+    allow_commit_timestamp = true
+  ),
+  Modified TIMESTAMP NOT NULL OPTIONS (
+    allow_commit_timestamp = true
+  ),
+) PRIMARY KEY(Version);
 ```
 
 ## Installation
@@ -107,7 +123,14 @@ This creates a next migration file like `_examples/migrations/000001.sql`. You w
 $ wrench migrate up --directory ./_examples
 ```
 
-This executes migrations. This also creates `SchemaMigrations` table into your database to manage schema version if it does not exist.
+This executes migrations. This also creates `SchemaMigrations` & `SchemaMigrationsHistory` tables in your database to manage schema version if it does not exist.
+
+### Migrations history
+```sh
+$ wrench migrate history
+```
+This displays the history of migrations applied to your database, ordered by when they were first attempted.
+Migrations left in a dirty state and subsequently retried are reflected in the Modified timestamp.
 
 ### Apply single DDL/DML
 

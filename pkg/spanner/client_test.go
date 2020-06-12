@@ -20,15 +20,14 @@
 package spanner
 
 import (
+	"cloud.google.com/go/spanner"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"google.golang.org/api/iterator"
 	"io/ioutil"
 	"os"
 	"testing"
-
-	"cloud.google.com/go/spanner"
-	"github.com/google/uuid"
-	"google.golang.org/api/iterator"
 )
 
 const (
@@ -212,6 +211,7 @@ func TestExecuteMigrations(t *testing.T) {
 	// ensure that only 000002.sql has been applied.
 	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "YES")
 	ensureMigrationVersionRecord(t, ctx, client, 2, false)
+	ensureMigrationHistoryRecord(t, ctx, client, 2, false)
 
 	if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable); err != nil {
 		t.Fatalf("failed to execute migration: %v", err)
@@ -220,6 +220,7 @@ func TestExecuteMigrations(t *testing.T) {
 	// ensure that 000003.sql and 000004.sql have been applied.
 	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "NO")
 	ensureMigrationVersionRecord(t, ctx, client, 4, false)
+	ensureMigrationHistoryRecord(t, ctx, client, 4, false)
 
 	// ensure that schema is not changed and ExecuteMigrate is safely finished even though no migrations should be applied.
 	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "NO")
@@ -255,6 +256,20 @@ func ensureMigrationColumn(t *testing.T, ctx context.Context, client *Client, co
 	if want, got := isNullable, c.IsNullable; want != got {
 		t.Errorf("want %s, but got %s", want, got)
 	}
+}
+
+func ensureMigrationHistoryRecord(t *testing.T, ctx context.Context, client *Client, version int64, dirty bool) {
+	history, err := client.GetMigrationHistory(ctx, migrationTable)
+	for i := range history {
+		if history[i].Version == version && history[i].Dirty == dirty{
+			return
+		}
+	}
+	if err != nil {
+		t.Fatalf("failed to get history: %v", err)
+	}
+
+	t.Errorf("(version %d, dirty %v) not found in history", version, dirty)
 }
 
 func ensureMigrationVersionRecord(t *testing.T, ctx context.Context, client *Client, version int64, dirty bool) {
@@ -344,9 +359,6 @@ func TestSetSchemaMigrationVersion(t *testing.T) {
 func TestEnsureMigrationTable(t *testing.T) {
 	ctx := context.Background()
 
-	client, done := testClientWithDatabase(t, ctx)
-	defer done()
-
 	tests := map[string]struct {
 		table string
 	}{
@@ -356,6 +368,9 @@ func TestEnsureMigrationTable(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			client, done := testClientWithDatabase(t, ctx)
+			defer done()
+
 			if err := client.EnsureMigrationTable(ctx, test.table); err != nil {
 				t.Fatalf("failed to ensure migration table: %v", err)
 			}
@@ -383,6 +398,190 @@ func TestEnsureMigrationTable(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("also creates history table", func(t *testing.T) {
+		client, done := testClientWithDatabase(t, ctx)
+		defer done()
+
+		if err := client.EnsureMigrationTable(ctx, migrationTable); err != nil {
+			t.Fatalf("failed to ensure migration table: %v", err)
+		}
+
+		if client.tableExists(ctx, migrationTable+historyStr) == false {
+			t.Fatal("failed to create history table")
+		}
+	})
+}
+
+func TestClient_DetermineUpgradeStatus(t *testing.T) {
+	type args struct {
+		tableName    string
+		ddlStatement string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    UpgradeStatus
+		wantErr bool
+	}{
+		{
+			string(FirstRun),
+			args{"NonExistentTable", ""},
+			FirstRun,
+			false,
+		},
+		{
+			string(ExistingMigrationsNoUpgrade),
+			args{migrationTable, "DROP TABLE " + migrationTable + historyStr},
+			ExistingMigrationsNoUpgrade,
+			false,
+		},
+		{
+			string(ExistingMigrationsUpgradeStarted),
+			args{migrationTable, createUpgradeIndicatorSql},
+			ExistingMigrationsUpgradeStarted,
+			false,
+		},
+		{
+			string(ExistingMigrationsUpgradeCompleted),
+			args{migrationTable, ""},
+			ExistingMigrationsUpgradeCompleted,
+			false,
+		},
+		{
+			"UndeterminedState",
+			args{"NonExistentTable", createUpgradeIndicatorSql},
+			"",
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			client, done := testClientWithDatabase(t, ctx)
+			defer done()
+
+			if tt.args.ddlStatement != "" {
+				err := client.ApplyDDL(ctx, []string{tt.args.ddlStatement})
+				if err != nil {
+					t.Error(err)
+				}
+			}
+
+			got, err := client.DetermineUpgradeStatus(ctx, tt.args.tableName)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DetermineUpgradeStatus() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("DetermineUpgradeStatus() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHotfixMigration(t *testing.T) {
+	ctx := context.Background()
+	client, done := testClientWithDatabase(t, ctx)
+	defer done()
+
+	// apply changes from "trunk": [100, 200]
+	migrations, err := LoadMigrations("testdata/hotfix/a")
+	if err != nil {
+		t.Fatalf("failed to load migrations: %v", err)
+	}
+	if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable); err != nil {
+		t.Fatalf("failed to execute migration: %v", err)
+	}
+	history, err := client.GetMigrationHistory(ctx, migrationTable)
+	if err != nil {
+		t.Fatalf("failed to get migration history: %v", err)
+	}
+	if len(history) != 2 {
+		t.Errorf("incorrect history versions: %+v", history)
+	}
+	ensureMigrationHistoryRecord(t, ctx, client, 100, false)
+	ensureMigrationHistoryRecord(t, ctx, client, 200, false)
+
+	// apply changes from "hotfix" branch: [101]
+	migrations, err = LoadMigrations("testdata/hotfix/b")
+	if err != nil {
+		t.Fatalf("failed to load migrations: %v", err)
+	}
+	if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable); err != nil {
+		t.Fatalf("failed to execute migration: %v", err)
+	}
+	history, err = client.GetMigrationHistory(ctx, migrationTable)
+	if err != nil {
+		t.Fatalf("failed to get migration history: %v", err)
+	}
+	if len(history) != 3 {
+		t.Errorf("incorrect history versions: %+v", history)
+	}
+	ensureMigrationHistoryRecord(t, ctx, client, 101, false)
+}
+
+func TestUpgrade(t *testing.T) {
+	t.Run("PriorMigrationsBackfilledInHistoryTable", func(t *testing.T) {
+		ctx := context.Background()
+		client, done := testClientWithDatabase(t, ctx)
+		defer done()
+
+		// run migrations
+		migrations, err := LoadMigrations("testdata/migrations")
+		if err != nil {
+			t.Fatalf("failed to load migrations: %v", err)
+		}
+		if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable); err != nil {
+			t.Fatalf("failed to execute migration: %v", err)
+		}
+		expected, err := client.GetMigrationHistory(ctx, migrationTable)
+		if err != nil {
+			t.Fatalf("failed to get migration history: %v", err)
+		}
+
+		// clear history table
+		if err := client.ApplyDDL(ctx, []string{"DROP TABLE " + migrationTable + historyStr}); err != nil {
+			t.Fatalf("failed to drop migration history: %v", err)
+		}
+		if err := client.EnsureMigrationTable(ctx, migrationTable); err != nil {
+			t.Fatalf("failed to recreate migration table: %v", err)
+		}
+		if client.tableExists(ctx, upgradeIndicator) == false {
+			t.Error("upgrade indicator should exist")
+		}
+		if err := client.UpgradeExecuteMigrations(ctx, migrations, len(migrations), migrationTable); err != nil {
+			t.Fatalf("failed to execute migration: %v", err)
+		}
+
+		// history is backfilled
+		actual, err := client.GetMigrationHistory(ctx, migrationTable)
+		if err != nil {
+			t.Fatalf("failed to get migration history: %v", err)
+		}
+		if len(expected) != len(actual) {
+			t.Error("missing versions in backfilled history")
+		}
+		if client.tableExists(ctx, upgradeIndicator) == true {
+			t.Error("upgrade indicator should be dropped")
+		}
+
+		contains := func(m []MigrationHistoryRecord, v int64) bool {
+			for i := range m {
+				if m[i].Version == v {
+					return true
+				}
+			}
+			return false
+		}
+
+		if (contains(actual, 2) && contains(actual, 3) && contains(actual, 4)) == false {
+			t.Errorf("missing version in history table %+v", actual)
+		}
+	})
+
 }
 
 func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func()) {
@@ -403,6 +602,7 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 	if database == "" {
 		id := uuid.New()
 		database = fmt.Sprintf("wrench-test-%s", id.String()[:8])
+		t.Log("creating " + database)
 	}
 
 	config := &Config{
@@ -431,5 +631,6 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 		if err := client.DropDatabase(ctx); err != nil {
 			t.Fatalf("failed to delete database: %v", err)
 		}
+		t.Log("dropped database " + database)
 	}
 }

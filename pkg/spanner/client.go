@@ -23,7 +23,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"google.golang.org/grpc/codes"
 	"sort"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	admin "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -33,8 +35,20 @@ import (
 )
 
 const (
-	ddlStatementsSeparator = ";"
+	ddlStatementsSeparator             = ";"
+	upgradeIndicator                   = "wrench_upgrade_indicator"
+	historyStr                         = "History"
+	FirstRun                           = UpgradeStatus("FirstRun")
+	ExistingMigrationsNoUpgrade        = UpgradeStatus("NoUpgrade")
+	ExistingMigrationsUpgradeStarted   = UpgradeStatus("Started")
+	ExistingMigrationsUpgradeCompleted = UpgradeStatus("Completed")
+	createUpgradeIndicatorFormatString = `CREATE TABLE %s (Dummy INT64 NOT NULL) PRIMARY KEY(Dummy)`
 )
+var (
+	createUpgradeIndicatorSql          = fmt.Sprintf(createUpgradeIndicatorFormatString, upgradeIndicator)
+)
+
+type UpgradeStatus string
 
 type table struct {
 	TableName string `spanner:"table_name"`
@@ -44,6 +58,13 @@ type Client struct {
 	config             *Config
 	spannerClient      *spanner.Client
 	spannerAdminClient *admin.DatabaseAdminClient
+}
+
+type MigrationHistoryRecord struct {
+	Version  int64     `spanner:"Version"`
+	Dirty    bool      `spanner:"Dirty"`
+	Created  time.Time `spanner:"Created"`
+	Modified time.Time `spanner:"Modified"`
 }
 
 func NewClient(ctx context.Context, config *Config) (*Client, error) {
@@ -263,6 +284,99 @@ func (c *Client) ApplyPartitionedDML(ctx context.Context, statements []string) (
 
 	return numAffectedRows, nil
 }
+func (c *Client) UpgradeExecuteMigrations(ctx context.Context, migrations Migrations, limit int, tableName string) error {
+	err := c.backfillMigrations(ctx, migrations, tableName)
+	if err != nil {
+		return err
+	}
+
+	err = c.ExecuteMigrations(ctx, migrations, limit, tableName)
+	if err != nil {
+		return err
+	}
+
+	return c.markUpgradeComplete(ctx)
+}
+
+func (c *Client) backfillMigrations(ctx context.Context, migrations Migrations, tableName string) error {
+	v, d, err := c.GetSchemaMigrationVersion(ctx, tableName)
+	if err != nil {
+		return err
+	}
+
+	historyTableName := tableName + historyStr
+	_, err = c.spannerClient.ReadWriteTransaction(ctx, func(ctx context.Context, rw *spanner.ReadWriteTransaction) error {
+		for i := range migrations {
+			if v > migrations[i].Version {
+				if err := c.upsertVersionHistory(ctx, rw, int64(migrations[i].Version), false, historyTableName); err != nil {
+					return err
+				}
+			} else if v == migrations[i].Version {
+				if err := c.upsertVersionHistory(ctx, rw, int64(migrations[i].Version), d, historyTableName); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) upsertVersionHistory(ctx context.Context, rw *spanner.ReadWriteTransaction, version int64, dirty bool, historyTableName string) error {
+	_, err := rw.ReadRow(ctx, historyTableName, spanner.Key{version}, []string{"Version", "Dirty", "Created", "Modified"})
+	if err != nil {
+		// insert
+		if spanner.ErrCode(err) == codes.NotFound {
+			return rw.BufferWrite([]*spanner.Mutation{
+				spanner.Insert(historyTableName,
+					[]string{"Version", "Dirty", "Created", "Modified"},
+					[]interface{}{version, dirty, spanner.CommitTimestamp, spanner.CommitTimestamp})})
+		}
+		return err
+	}
+
+	// update
+	return rw.BufferWrite([]*spanner.Mutation{
+		spanner.Update(historyTableName,
+			[]string{"Version", "Dirty", "Modified"},
+			[]interface{}{version, dirty, spanner.CommitTimestamp})})
+}
+
+func (c *Client) markUpgradeComplete(ctx context.Context) error {
+	err := c.ApplyDDL(ctx, []string{"DROP TABLE " + upgradeIndicator})
+	if err != nil {
+		return &Error{
+			Code: ErrorCodeCompleteUpgrade,
+			err:  err,
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) GetMigrationHistory(ctx context.Context, versionTableName string) ([]MigrationHistoryRecord, error) {
+	history := make([]MigrationHistoryRecord, 0)
+	stmt := spanner.NewStatement("SELECT Version, Dirty, Created, Modified FROM " + versionTableName + historyStr)
+	err := c.spannerClient.Single().Query(ctx, stmt).Do(func(r *spanner.Row) error {
+		version := MigrationHistoryRecord{}
+		if err := r.ToStruct(&version); err != nil {
+			return err
+		}
+		history = append(history, version)
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return history, nil
+}
 
 func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, limit int, tableName string) error {
 	sort.Sort(migrations)
@@ -285,13 +399,25 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 		}
 	}
 
+	history, err := c.GetMigrationHistory(ctx, tableName)
+	if err != nil {
+		return &Error{
+			Code: ErrorCodeExecuteMigrations,
+			err:  err,
+		}
+	}
+	applied := make(map[int64]bool)
+	for i := range history {
+		applied[history[i].Version] = true
+	}
+
 	var count int
 	for _, m := range migrations {
 		if limit == 0 {
 			break
 		}
 
-		if m.Version <= version {
+		if applied[int64(m.Version)] {
 			continue
 		}
 
@@ -395,7 +521,11 @@ func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, di
 				[]interface{}{int64(version), dirty},
 			),
 		}
-		return tx.BufferWrite(m)
+		if err := tx.BufferWrite(m); err != nil {
+			return err
+		}
+
+		return c.upsertVersionHistory(ctx, tx, int64(version), dirty, tableName+historyStr)
 	})
 	if err != nil {
 		return &Error{
@@ -405,23 +535,6 @@ func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, di
 	}
 
 	return nil
-}
-
-func (c *Client) EnsureMigrationTable(ctx context.Context, tableName string) error {
-	iter := c.spannerClient.Single().Read(ctx, tableName, spanner.AllKeys(), []string{"Version"})
-	err := iter.Do(func(r *spanner.Row) error {
-		return nil
-	})
-	if err == nil {
-		return nil
-	}
-
-	stmt := fmt.Sprintf(`CREATE TABLE %s (
-    Version INT64 NOT NULL,
-    Dirty    BOOL NOT NULL
-	) PRIMARY KEY(Version)`, tableName)
-
-	return c.ApplyDDL(ctx, []string{stmt})
 }
 
 func (c *Client) Close() error {
@@ -434,4 +547,119 @@ func (c *Client) Close() error {
 	}
 
 	return nil
+}
+
+func (c *Client) EnsureMigrationTable(ctx context.Context, tableName string) error {
+	fmtErr := func(err error) *Error {
+		return &Error{
+			Code: ErrorCodeEnsureMigrationTables,
+			err:  err,
+		}
+	}
+	status, err := c.DetermineUpgradeStatus(ctx, tableName)
+	if err != nil {
+		return fmtErr(err)
+	}
+
+	switch status {
+	case FirstRun:
+		if err := c.createVersionTable(ctx, tableName); err != nil {
+			return fmtErr(err)
+		}
+		if err := c.createHistoryTable(ctx, tableName+historyStr); err != nil {
+			return fmtErr(err)
+		}
+	case ExistingMigrationsNoUpgrade:
+		if err := c.createUpgradeIndicatorTable(ctx); err != nil {
+			return fmtErr(err)
+		}
+		if err := c.createHistoryTable(ctx, tableName+historyStr); err != nil {
+			return fmtErr(err)
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) DetermineUpgradeStatus(ctx context.Context, tableName string) (UpgradeStatus, error) {
+	stmt := spanner.NewStatement(`SELECT table_name FROM information_schema.tables WHERE table_catalog = '' AND table_schema = ''
+AND table_name in (@version, @history, @indicator)`)
+	stmt.Params["version"] = tableName
+	stmt.Params["history"] = tableName + historyStr
+	stmt.Params["indicator"] = upgradeIndicator
+	iter := c.spannerClient.Single().Query(ctx, stmt)
+
+	tables := make(map[string]bool)
+	err := iter.Do(func(r *spanner.Row) error {
+		t := &table{}
+		if err := r.ToStruct(t); err != nil {
+			return err
+		}
+		tables[t.TableName] = true
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	switch {
+	case len(tables) == 0:
+		return FirstRun, nil
+	case len(tables) == 1 && tables[tableName]:
+		return ExistingMigrationsNoUpgrade, nil
+	case len(tables) == 2 && tables[tableName] && tables[tableName+historyStr]:
+		return ExistingMigrationsUpgradeCompleted, nil
+	case len(tables) > 1 && tables[tableName] && tables[upgradeIndicator]:
+		return ExistingMigrationsUpgradeStarted, nil
+	default:
+		return "", fmt.Errorf("undetermined state of schema version tables %+v", tables)
+	}
+}
+
+func (c *Client) tableExists(ctx context.Context, tableName string) bool {
+	ri := c.spannerClient.Single().Query(ctx, spanner.Statement{
+		SQL: "SELECT table_name FROM information_schema.tables WHERE table_catalog = '' AND table_name = @table",
+		Params: map[string]interface{}{"table": tableName},
+	})
+	defer ri.Stop()
+	_, err := ri.Next()
+	return err != iterator.Done
+}
+
+func (c *Client) createHistoryTable(ctx context.Context, historyTableName string) error {
+	if c.tableExists(ctx, historyTableName) {
+		return nil
+	}
+
+	stmt := fmt.Sprintf(`CREATE TABLE %s (
+    Version INT64 NOT NULL,
+	Dirty BOOL NOT NULL,
+	Created TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
+	Modified TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)
+	) PRIMARY KEY(Version)`, historyTableName)
+
+	return c.ApplyDDL(ctx, []string{stmt})
+}
+
+func (c *Client) createUpgradeIndicatorTable(ctx context.Context) error {
+	if c.tableExists(ctx, upgradeIndicator) {
+		return nil
+	}
+
+	stmt := fmt.Sprintf(createUpgradeIndicatorFormatString, upgradeIndicator)
+
+	return c.ApplyDDL(ctx, []string{stmt})
+}
+
+func (c *Client) createVersionTable(ctx context.Context, tableName string) error {
+	if c.tableExists(ctx, tableName) {
+		return nil
+	}
+
+	stmt := fmt.Sprintf(`CREATE TABLE %s (
+    Version INT64 NOT NULL,
+    Dirty    BOOL NOT NULL
+	) PRIMARY KEY(Version)`, tableName)
+
+	return c.ApplyDDL(ctx, []string{stmt})
 }

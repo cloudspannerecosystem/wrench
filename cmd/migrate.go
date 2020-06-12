@@ -25,8 +25,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
@@ -64,12 +66,18 @@ func init() {
 		Short: "Set version V but don't run migration (ignores dirty state)",
 		RunE:  migrateSet,
 	}
+	migrateHistoryCmd := &cobra.Command{
+		Use: "history",
+		Short: "Print migration version history",
+		RunE: migrateHistory,
+	}
 
 	migrateCmd.AddCommand(
 		migrateCreateCmd,
 		migrateUpCmd,
 		migrateVersionCmd,
 		migrateSetCmd,
+		migrateHistoryCmd,
 	)
 
 	migrateCmd.PersistentFlags().String(flagNameDirectory, "", "Directory that migration files placed (required)")
@@ -127,13 +135,6 @@ func migrateUp(c *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
-		return &Error{
-			cmd: c,
-			err: err,
-		}
-	}
-
 	dir := filepath.Join(c.Flag(flagNameDirectory).Value.String(), migrationsDirName)
 	migrations, err := spanner.LoadMigrations(dir)
 	if err != nil {
@@ -143,7 +144,31 @@ func migrateUp(c *cobra.Command, args []string) error {
 		}
 	}
 
-	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName)
+	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
+		return &Error{
+			cmd: c,
+			err: err,
+		}
+	}
+
+	status, err := client.DetermineUpgradeStatus(ctx, migrationTableName)
+	if err != nil {
+		return &Error{
+			cmd: c,
+			err: err,
+		}
+	}
+	switch status {
+	case spanner.ExistingMigrationsUpgradeStarted:
+		return client.UpgradeExecuteMigrations(ctx, migrations, limit, migrationTableName)
+	case spanner.ExistingMigrationsUpgradeCompleted:
+		return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName)
+	default:
+		return &Error{
+			cmd: c,
+			err: errors.New("migration in undetermined state"),
+		}
+	}
 }
 
 func migrateVersion(c *cobra.Command, args []string) error {
@@ -176,6 +201,34 @@ func migrateVersion(c *cobra.Command, args []string) error {
 	}
 
 	fmt.Println(v)
+
+	return nil
+}
+
+func migrateHistory(c *cobra.Command, args []string) error {
+	ctx := context.Background()
+
+	client, err := newSpannerClient(ctx, c)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	history, err := client.GetMigrationHistory(ctx, migrationTableName)
+	if err != nil {
+		return err
+	}
+	sort.SliceStable(history, func(i, j int) bool {
+		return history[i].Created.Before(history[j].Created) // order by Created
+	})
+
+	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	fmt.Fprintln(writer, "Version\tDirty\tCreated\tModified")
+	for i := range history {
+		h := history[i]
+		fmt.Fprintf(writer, "%d\t%v\t%v\t%v\n", h.Version, h.Dirty, h.Created, h.Modified)
+	}
+	writer.Flush()
 
 	return nil
 }
