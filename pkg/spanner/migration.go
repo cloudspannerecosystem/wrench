@@ -42,12 +42,18 @@ var (
 
 	MigrationNameRegex = regexp.MustCompile(`[a-zA-Z0-9_\-]+`)
 
-	dmlRegex = regexp.MustCompile("^(UPDATE|DELETE)[\t\n\f\r ].*")
+	dmlAnyRegex = regexp.MustCompile("^(UPDATE|DELETE|INSERT)[\t\n\f\r ].*")
+
+	// INSERT statements are not supported for partitioned DML. Although not every DML can be partitioned
+	// as it must be idempotent. This probably isn't solvable with more regexes.
+	notPartitionedDmlRegex = regexp.MustCompile("INSERT")
+
 )
 
 const (
 	statementKindDDL statementKind = "DDL"
 	statementKindDML statementKind = "DML"
+	statementKindPartitionedDML statementKind = "PartitionedDML"
 )
 
 type (
@@ -143,27 +149,55 @@ func inspectStatementsKind(statements []string) (statementKind, error) {
 	kindMap := map[statementKind]uint64{
 		statementKindDDL: 0,
 		statementKindDML: 0,
+		statementKindPartitionedDML: 0,
 	}
 
 	for _, s := range statements {
-		if isDML(s) {
-			kindMap[statementKindDML]++
-		} else {
-			kindMap[statementKindDDL]++
-		}
+		kindMap[getStatementKind(s)]++
 	}
 
-	if kindMap[statementKindDML] > 0 {
-		if kindMap[statementKindDDL] > 0 {
-			return "", errors.New("Cannot specify DDL and DML at same migration file.")
-		}
+	if distinctKind(kindMap, statementKindDDL) {
+		return statementKindDDL, nil
+	}
 
+	if distinctKind(kindMap, statementKindDML) {
 		return statementKindDML, nil
 	}
 
-	return statementKindDDL, nil
+	if distinctKind(kindMap, statementKindPartitionedDML) {
+		return statementKindPartitionedDML, nil
+	}
+
+	return "", errors.New("Cannot specify DDL and DML in the same migration file")
 }
 
-func isDML(statement string) bool {
-	return dmlRegex.Match([]byte(statement))
+func distinctKind(kindMap map[statementKind]uint64, kind statementKind) bool {
+	target := kindMap[kind]
+
+	var total uint64
+	for k:= range kindMap {
+		total = total + kindMap[k]
+	}
+
+	return target == total
+}
+
+func getStatementKind(statement string) statementKind {
+	if isPartitionedDMLOnly(statement){
+		return statementKindPartitionedDML
+	}
+
+	if isDMLAny(statement){
+		return statementKindDML
+	}
+
+	return statementKindDDL
+}
+
+func isPartitionedDMLOnly(statement string) bool {
+	return isDMLAny(statement) && !notPartitionedDmlRegex.Match([]byte(statement))
+}
+
+func isDMLAny(statement string) bool {
+	return dmlAnyRegex.Match([]byte(statement))
 }
