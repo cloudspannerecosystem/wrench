@@ -18,3 +18,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
+          ldflags: -X github.com/cloudspannerecosystem/wrench/cmd.Version=${{ github.event.release.tag_name }}
