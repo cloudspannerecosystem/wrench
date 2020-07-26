@@ -7,3 +7,7 @@ CREATE TABLE Singers (
   SingerID STRING(36) NOT NULL,
   FirstName STRING(1024),
 ) PRIMARY KEY(SingerID);
+
+CREATE TABLE TableWithComments (
+  ID STRING(36) NOT NULL,
+) PRIMARY KEY(ID);

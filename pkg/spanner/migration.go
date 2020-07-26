@@ -20,7 +20,6 @@
 package spanner
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -44,6 +43,10 @@ var (
 	MigrationNameRegex = regexp.MustCompile(`[a-zA-Z0-9_\-]+`)
 
 	dmlRegex = regexp.MustCompile("^(UPDATE|DELETE)[\t\n\f\r ].*")
+
+	commentsRemovalRegex = regexp.MustCompile("(#[^\r\n]*|\\-\\-[^\r\n]*|\\/\\*[^\\*/]*?\\*\\/)")
+
+	commentsWhiteSpaceRemovalRegex = regexp.MustCompile("(?m)^\\\\s*\\r?\\n")
 )
 
 const (
@@ -138,7 +141,8 @@ func LoadMigrations(dir string) (Migrations, error) {
 }
 
 func toStatements(file []byte) []string {
-	contents := bytes.Split(file, []byte(statementsSeparator))
+	commentRemmoved := removeComments(string(file))
+	contents := strings.Split(commentRemmoved, statementsSeparator)
 
 	statements := make([]string, 0, len(contents))
 	for _, c := range contents {
@@ -146,8 +150,12 @@ func toStatements(file []byte) []string {
 			statements = append(statements, statement)
 		}
 	}
-
 	return statements
+}
+
+func removeComments(statement string) string {
+	s := commentsRemovalRegex.ReplaceAllString(statement, "")
+	return commentsWhiteSpaceRemovalRegex.ReplaceAllString(s, "")
 }
 
 func inspectStatementsKind(statements []string) (statementKind, error) {

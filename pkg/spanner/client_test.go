@@ -62,23 +62,41 @@ const (
 )
 
 func TestLoadDDL(t *testing.T) {
-	ctx := context.Background()
-
-	client, done := testClientWithDatabase(t, ctx)
-	defer done()
-
-	gotDDL, err := client.LoadDDL(ctx)
-	if err != nil {
-		t.Fatalf("failed to load ddl: %v", err)
+	tests := map[string]struct {
+		schema string
+		want   string
+	}{
+		"If schema has no comment strings, it should work without any errors": {
+			"testdata/schema.sql",
+			"testdata/schema.sql",
+		},
+		"If schema has comment strings, it should work without any errors": {
+			"testdata/schema_with_comment.sql",
+			"testdata/schema.sql",
+		},
 	}
+	for name, tt := range tests {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
 
-	wantDDL, err := ioutil.ReadFile("testdata/schema.sql")
-	if err != nil {
-		t.Fatalf("failed to read ddl file: %v", err)
-	}
+			client, done := testClientWithDatabaseByFileName(t, ctx, tt.schema)
+			defer done()
 
-	if want, got := string(wantDDL), string(gotDDL); want != got {
-		t.Errorf("want: \n%s\n but got: \n%s", want, got)
+			gotDDL, err := client.LoadDDL(ctx)
+			if err != nil {
+				t.Fatalf("failed to load ddl: %v", err)
+			}
+
+			wantDDL, err := ioutil.ReadFile(tt.want)
+			if err != nil {
+				t.Fatalf("failed to read ddl file: %v", err)
+			}
+
+			if want, got := string(wantDDL), string(gotDDL); want != got {
+				t.Errorf("want: \n%s\n but got: \n%s", want, got)
+			}
+		})
 	}
 }
 
@@ -434,7 +452,7 @@ func TestPriorityPBOf(t *testing.T) {
 
 }
 
-func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func()) {
+func testClientWithDatabaseByFileName(t *testing.T, ctx context.Context, schema string) (*Client, func()) {
 	t.Helper()
 
 	project := os.Getenv(envSpannerProjectID)
@@ -465,7 +483,7 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 		t.Fatalf("failed to create spanner client: %v", err)
 	}
 
-	ddl, err := ioutil.ReadFile("testdata/schema.sql")
+	ddl, err := ioutil.ReadFile(schema)
 	if err != nil {
 		t.Fatalf("failed to read schema file: %v", err)
 	}
@@ -481,4 +499,8 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 			t.Fatalf("failed to delete database: %v", err)
 		}
 	}
+}
+
+func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func()) {
+	return testClientWithDatabaseByFileName(t, ctx, "testdata/schema.sql")
 }
