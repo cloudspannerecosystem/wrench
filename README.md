@@ -122,7 +122,7 @@ Use `wrench [command] --help` for more information about a command.
 
 ## Contributions
 
-Please read the [contribution guidelines](CONTRIBUTING.MD) before submitting
+Please read the [contribution guidelines](CONTRIBUTING.md) before submitting
 pull requests.
 
 ## License
