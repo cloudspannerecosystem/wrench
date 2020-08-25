@@ -42,11 +42,12 @@ var (
 
 	MigrationNameRegex = regexp.MustCompile(`[a-zA-Z0-9_\-]+`)
 
-	dmlAnyRegex = regexp.MustCompile("^(UPDATE|DELETE|INSERT)[\t\n\f\r ].*")
+	dmlAnyRegex = regexp.MustCompile("(?i)^(UPDATE|DELETE|INSERT)[\t\n\f\r ].*")
 
-	// INSERT statements are not supported for partitioned DML. Although not every DML can be partitioned
-	// as it must be idempotent. This probably isn't solvable with more regexes.
-	notPartitionedDmlRegex = regexp.MustCompile("INSERT")
+	// Instead of a regex to determine if a DML statement is a PartitionedDML we check if it's
+	// not a PartitionedDML by checking for INSERT statements.
+	// An improvement would be to use spanners algo to distinguish between DML types.
+	notPartitionedDmlRegex = regexp.MustCompile(`(?i)^INSERT`)
 
 )
 
