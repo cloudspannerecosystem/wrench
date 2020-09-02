@@ -2,6 +2,9 @@ on:
   release:
     types: [created]
 
+env:
+  CGO_ENABLED: 0
+
 jobs:
   release-linux-amd64:
     name: release linux/amd64
@@ -19,3 +22,4 @@ jobs:
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
           ldflags: -X github.com/cloudspannerecosystem/wrench/cmd.Version=${{ github.event.release.tag_name }}
+          build_flags: -tags netgo
