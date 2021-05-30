@@ -12,4 +12,4 @@ require (
 	google.golang.org/grpc v1.28.1
 )
 
-go 1.14
+go 1.16
