@@ -27,6 +27,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	admin "cloud.google.com/go/spanner/admin/database/apiv1"
+	"github.com/hashicorp/go-multierror"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	databasepb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
@@ -118,7 +119,7 @@ func (c *Client) DropDatabase(ctx context.Context) error {
 }
 
 func (c *Client) TruncateAllTables(ctx context.Context) error {
-	var m []*spanner.Mutation
+	var stms []spanner.Statement
 
 	ri := c.spannerClient.Single().Query(ctx, spanner.Statement{
 		SQL: "SELECT table_name FROM information_schema.tables WHERE table_catalog = '' AND table_schema = ''",
@@ -133,7 +134,7 @@ func (c *Client) TruncateAllTables(ctx context.Context) error {
 			return nil
 		}
 
-		m = append(m, spanner.Delete(t.TableName, spanner.AllKeys()))
+		stms = append(stms, spanner.NewStatement(fmt.Sprintf("DELETE FROM `%s` WHERE true", t.TableName)))
 		return nil
 	})
 	if err != nil {
@@ -143,10 +144,15 @@ func (c *Client) TruncateAllTables(ctx context.Context) error {
 		}
 	}
 
-	_, err = c.spannerClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		return txn.BufferWrite(m)
-	})
-	if err != nil {
+	g := &multierror.Group{}
+	for _, stmt := range stms {
+		stmt := stmt
+		g.Go(func() error {
+			_, err := c.spannerClient.PartitionedUpdate(ctx, stmt)
+			return err
+		})
+	}
+	if err := g.Wait(); err != nil {
 		return &Error{
 			Code: ErrorCodeTruncateAllTables,
 			err:  err,
