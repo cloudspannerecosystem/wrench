@@ -15,6 +15,7 @@ go_library(
         "@com_google_cloud_go_spanner//:go_default_library",
         "@com_google_cloud_go_spanner//admin/database/apiv1:go_default_library",
         "@go_googleapis//google/spanner/admin/database/v1:database_go_proto",
+        "@go_googleapis//google/spanner/v1:spanner_go_proto",
         "@org_golang_google_api//iterator:go_default_library",
         "@org_golang_google_api//option:go_default_library",
         "@org_golang_google_grpc//status:go_default_library",
@@ -32,6 +33,7 @@ go_test(
     deps = [
         "@com_github_google_uuid//:go_default_library",
         "@com_google_cloud_go_spanner//:go_default_library",
+        "@go_googleapis//google/spanner/v1:spanner_go_proto",
         "@org_golang_google_api//iterator:go_default_library",
     ],
 )
