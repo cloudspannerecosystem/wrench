@@ -29,6 +29,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
+	sppb "google.golang.org/genproto/googleapis/spanner/v1"
 )
 
 const (
@@ -132,9 +133,24 @@ func TestApplyDMLFile(t *testing.T) {
 
 	tests := map[string]struct {
 		partitioned bool
+		priority    PriorityType
 	}{
-		"normal DML":      {partitioned: false},
-		"partitioned DML": {partitioned: true},
+		"normal DML and high priority": {
+			partitioned: false,
+			priority:    PriorityTypeHigh,
+		},
+		"partitioned DML and high priority": {
+			partitioned: true,
+			priority:    PriorityTypeHigh,
+		},
+		"normal DML and medium priority": {
+			partitioned: false,
+			priority:    PriorityTypeMedium,
+		},
+		"partitioned DML and low priority": {
+			partitioned: true,
+			priority:    PriorityTypeLow,
+		},
 	}
 
 	for name, test := range tests {
@@ -156,7 +172,7 @@ func TestApplyDMLFile(t *testing.T) {
 				t.Fatalf("failed to read dml file: %v", err)
 			}
 
-			n, err := client.ApplyDMLFile(ctx, dml, test.partitioned)
+			n, err := client.ApplyDMLFile(ctx, dml, test.partitioned, test.priority)
 			if err != nil {
 				t.Fatalf("failed to apply dml file: %v", err)
 			}
@@ -383,6 +399,39 @@ func TestEnsureMigrationTable(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPriorityPBOf(t *testing.T) {
+	tests := map[string]struct {
+		priority PriorityType
+		want     sppb.RequestOptions_Priority
+	}{
+		"priority high": {
+			priority: PriorityTypeHigh,
+			want:     sppb.RequestOptions_PRIORITY_HIGH,
+		},
+		"priority midium": {
+			priority: PriorityTypeMedium,
+			want:     sppb.RequestOptions_PRIORITY_MEDIUM,
+		},
+		"priority low": {
+			priority: PriorityTypeLow,
+			want:     sppb.RequestOptions_PRIORITY_LOW,
+		},
+		"priority unspecified": {
+			priority: PriorityTypeUnspecified,
+			want:     sppb.RequestOptions_PRIORITY_UNSPECIFIED,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := priorityPBOf(test.priority)
+			if got != test.want {
+				t.Fatalf("want %s, but got %s", test.want, got)
+			}
+		})
+	}
+
 }
 
 func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func()) {

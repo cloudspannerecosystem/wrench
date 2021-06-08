@@ -23,8 +23,9 @@ import (
 	"context"
 	"path/filepath"
 
-	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
+
+	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 )
 
 const (
@@ -37,6 +38,7 @@ const (
 	flagDDLFile           = "ddl"
 	flagDMLFile           = "dml"
 	flagPartitioned       = "partitioned"
+	flagPriority          = "priority"
 	defaultSchemaFileName = "schema.sql"
 )
 
