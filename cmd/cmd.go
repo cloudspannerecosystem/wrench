@@ -39,6 +39,7 @@ const (
 	flagDMLFile           = "dml"
 	flagPartitioned       = "partitioned"
 	flagPriority          = "priority"
+	flagNode              = "node"
 	defaultSchemaFileName = "schema.sql"
 )
 
@@ -51,6 +52,25 @@ func newSpannerClient(ctx context.Context, c *cobra.Command) (*spanner.Client, e
 	}
 
 	client, err := spanner.NewClient(ctx, config)
+	if err != nil {
+		return nil, &Error{
+			err: err,
+			cmd: c,
+		}
+	}
+
+	return client, nil
+}
+
+func newSpannerAdminClient(ctx context.Context, c *cobra.Command) (*spanner.AdminClient, error) {
+	config := &spanner.Config{
+		Project:         c.Flag(flagNameProject).Value.String(),
+		Instance:        c.Flag(flagNameInstance).Value.String(),
+		Database:        c.Flag(flagNameDatabase).Value.String(),
+		CredentialsFile: c.Flag(flagCredentialsFile).Value.String(),
+	}
+
+	client, err := spanner.NewAdminClient(ctx, config)
 	if err != nil {
 		return nil, &Error{
 			err: err,

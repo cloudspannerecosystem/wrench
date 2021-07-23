@@ -8,6 +8,7 @@ go_library(
         "create.go",
         "drop.go",
         "errors.go",
+        "instance.go",
         "load.go",
         "migrate.go",
         "reset.go",
