@@ -6,6 +6,7 @@ load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_push")
 
 # gazelle:prefix github.com/cloudspannerecosystem/wrench
+# gazelle:proto disable_global
 gazelle(name = "gazelle")
 
 nogo(

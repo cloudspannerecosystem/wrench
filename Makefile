@@ -18,6 +18,7 @@ dep: bin/bazelisk
 	bin/bazelisk run //:gazelle
 	bin/bazelisk run //:gazelle -- \
 		update-repos \
+		-build_file_proto_mode=disable_global \
 		-from_file go.mod \
 		-to_macro bazel/deps.bzl%wrench_deps \
 		-prune
