@@ -39,6 +39,7 @@ const (
 	ErrorCodeNoMigration
 	ErrorCodeMigrationVersionDirty
 	ErrorCodeWaitOperation
+	ErrorCodeCreateInstance
 )
 
 type Error struct {

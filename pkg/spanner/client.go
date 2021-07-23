@@ -26,7 +26,7 @@ import (
 	"sort"
 
 	"cloud.google.com/go/spanner"
-	admin "cloud.google.com/go/spanner/admin/database/apiv1"
+	databasev1 "cloud.google.com/go/spanner/admin/database/apiv1"
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -45,7 +45,7 @@ type table struct {
 type Client struct {
 	config             *Config
 	spannerClient      *spanner.Client
-	spannerAdminClient *admin.DatabaseAdminClient
+	spannerAdminClient *databasev1.DatabaseAdminClient
 }
 
 func NewClient(ctx context.Context, config *Config) (*Client, error) {
@@ -58,11 +58,11 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 	if err != nil {
 		return nil, &Error{
 			Code: ErrorCodeCreateClient,
-			err:  err,
+			err:  fmt.Errorf("failed to create spanner client: %w", err),
 		}
 	}
 
-	spannerAdminClient, err := admin.NewDatabaseAdminClient(ctx, opts...)
+	spannerAdminClient, err := databasev1.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		spannerClient.Close()
 		return nil, &Error{
@@ -302,7 +302,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 	if dirty {
 		return &Error{
 			Code: ErrorCodeMigrationVersionDirty,
-			err:  fmt.Errorf("Database version: %d is dirty, please fix it.", version),
+			err:  fmt.Errorf("database version: %d is dirty, please fix it", version),
 		}
 	}
 
@@ -341,7 +341,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 		default:
 			return &Error{
 				Code: ErrorCodeExecuteMigrations,
-				err:  fmt.Errorf("Unknown query type, version: %d", m.Version),
+				err:  fmt.Errorf("unknown query type, version: %d", m.Version),
 			}
 		}
 
@@ -380,10 +380,10 @@ func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string
 
 	row, err := iter.Next()
 	if err != nil {
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			return 0, false, &Error{
 				Code: ErrorCodeNoMigration,
-				err:  errors.New("No migration."),
+				err:  errors.New("no migration"),
 			}
 		}
 		return 0, false, &Error{
@@ -465,8 +465,9 @@ func priorityPBOf(priority PriorityType) sppb.RequestOptions_Priority {
 		return sppb.RequestOptions_PRIORITY_MEDIUM
 	case PriorityTypeLow:
 		return sppb.RequestOptions_PRIORITY_LOW
+	case PriorityTypeUnspecified:
+		return sppb.RequestOptions_PRIORITY_UNSPECIFIED
 	default:
 		return sppb.RequestOptions_PRIORITY_UNSPECIFIED
 	}
-
 }
