@@ -38,8 +38,36 @@ func instanceCreate(c *cobra.Command, _ []string) error {
 	return nil
 }
 
+var instanceDeleteCmd = &cobra.Command{
+	Use:   "delete",
+	Short: "Delete a instance",
+	Long:  "Delete a instance. This command will delete databases immediately and irrevocably disappear",
+	RunE:  instanceDelete,
+}
+
+func instanceDelete(c *cobra.Command, _ []string) error {
+	ctx := context.Background()
+
+	client, err := newSpannerAdminClient(ctx, c)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	err = client.DeleteInstance(ctx, instance)
+	if err != nil {
+		return &Error{
+			err: err,
+			cmd: c,
+		}
+	}
+
+	return nil
+}
+
 func init() {
+	instanceCreateCmd.Flags().Int32Var(&node, flagNode, 1, "TODO: ")
 	instanceCmd.AddCommand(instanceCreateCmd)
 
-	instanceCmd.PersistentFlags().Int32Var(&node, flagNode, 1, "TODO: ")
+	instanceCmd.AddCommand(instanceDeleteCmd)
 }
