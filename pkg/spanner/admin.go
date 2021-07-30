@@ -75,3 +75,18 @@ func (c *AdminClient) CreateInstance(ctx context.Context, node int32) error {
 
 	return nil
 }
+
+func (c *AdminClient) DeleteInstance(ctx context.Context, nmae string) error {
+	req := &instancepb.DeleteInstanceRequest{
+		Name: fmt.Sprintf("projects/%s/instances/%s", c.Project, c.Instance),
+	}
+
+	if err := c.spannerInstanceAdminClient.DeleteInstance(ctx, req); err != nil {
+		return &Error{
+			Code: ErrorCodeDeleteInstance,
+			err:  fmt.Errorf("failed to delete instance: %w", err),
+		}
+	}
+
+	return nil
+}
