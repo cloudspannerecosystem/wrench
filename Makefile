@@ -15,7 +15,7 @@ test: bin/bazelisk
 .PHONY: dep
 dep: bin/bazelisk
 	go mod tidy
-	bin/bazelisk run //:gazelle
+	bin/bazelisk run //:gazelle -- -exclude vendor
 	bin/bazelisk run //:gazelle -- \
 		update-repos \
 		-build_file_proto_mode=disable_global \
