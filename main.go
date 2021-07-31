@@ -26,6 +26,8 @@ import (
 	"os"
 	"os/signal"
 
+	"golang.org/x/sys/unix"
+
 	"github.com/cloudspannerecosystem/wrench/cmd"
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 )
@@ -35,7 +37,7 @@ func main() {
 }
 
 func execute() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(context.Background(), unix.SIGINT, unix.SIGTERM)
 	defer cancel()
 
 	handleError(cmd.Execute(ctx))

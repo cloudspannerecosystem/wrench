@@ -31,6 +31,7 @@ go_library(
     deps = [
         "//cmd:go_default_library",
         "//pkg/spanner:go_default_library",
+        "@org_golang_x_sys//unix:go_default_library",
     ],
 )
 
