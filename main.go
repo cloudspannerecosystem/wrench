@@ -20,9 +20,11 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 
 	"github.com/cloudspannerecosystem/wrench/cmd"
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
@@ -33,7 +35,10 @@ func main() {
 }
 
 func execute() {
-	handleError(cmd.Execute())
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	handleError(cmd.Execute(ctx))
 }
 
 func handleError(err error) {
