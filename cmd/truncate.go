@@ -20,8 +20,6 @@
 package cmd
 
 import (
-	"context"
-
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +30,7 @@ var truncateCmd = &cobra.Command{
 }
 
 func truncate(c *cobra.Command, _ []string) error {
-	ctx := context.Background()
+	ctx := c.Context()
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {

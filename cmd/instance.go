@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +17,7 @@ var instanceCreateCmd = &cobra.Command{
 }
 
 func instanceCreate(c *cobra.Command, _ []string) error {
-	ctx := context.Background()
+	ctx := c.Context()
 
 	client, err := newSpannerAdminClient(ctx, c)
 	if err != nil {
