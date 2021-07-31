@@ -20,7 +20,6 @@
 package cmd
 
 import (
-	"context"
 	"io/ioutil"
 
 	"github.com/spf13/cobra"
@@ -33,7 +32,7 @@ var loadCmd = &cobra.Command{
 }
 
 func load(c *cobra.Command, args []string) error {
-	ctx := context.Background()
+	ctx := c.Context()
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {

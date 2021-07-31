@@ -20,7 +20,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -44,7 +43,7 @@ var applyCmd = &cobra.Command{
 }
 
 func apply(c *cobra.Command, _ []string) error {
-	ctx := context.Background()
+	ctx := c.Context()
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
