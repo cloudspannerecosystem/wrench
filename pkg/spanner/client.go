@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	databasev1 "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -36,6 +37,10 @@ import (
 
 const (
 	ddlStatementsSeparator = ";"
+
+	// Set a timeout longer than the default 30 seconds. Partitioned DML tends to take long time to be finished.
+	// https://github.com/googleapis/google-cloud-go/blob/spanner/v1.11.0/spanner/apiv1/spanner_client.go#L318-L322
+	pdmlTimeout = 24 * time.Hour
 )
 
 type table struct {
@@ -264,10 +269,13 @@ func (c *Client) ApplyDML(ctx context.Context, statements []string, priority Pri
 }
 
 func (c *Client) ApplyPartitionedDML(ctx context.Context, statements []string, priority PriorityType) (int64, error) {
+	cctx, cancel := context.WithTimeout(ctx, pdmlTimeout)
+	defer cancel()
+
 	p := priorityPBOf(priority)
 	numAffectedRows := int64(0)
 	for _, s := range statements {
-		num, err := c.spannerClient.PartitionedUpdateWithOptions(ctx, spanner.Statement{
+		num, err := c.spannerClient.PartitionedUpdateWithOptions(cctx, spanner.Statement{
 			SQL: s,
 		}, spanner.QueryOptions{
 			Priority: p,
