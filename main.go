@@ -45,7 +45,7 @@ func execute() {
 
 func handleError(err error) {
 	if err != nil {
-		fmt.Fprint(os.Stderr, (fmt.Sprintf("%s\n\t%s\n", err.Error(), errorDetails(err))))
+		fmt.Fprintf(os.Stderr, "%s\n\t%s\n", err.Error(), errorDetails(err))
 		os.Exit(1)
 	}
 }
