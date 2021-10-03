@@ -22,6 +22,7 @@ package spanner
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
@@ -89,6 +90,9 @@ func LoadMigrations(dir string) (Migrations, error) {
 	}
 
 	var migrations Migrations
+
+	versions := map[uint64]string{}
+
 	for _, f := range files {
 		if f.IsDir() {
 			continue
@@ -104,7 +108,9 @@ func LoadMigrations(dir string) (Migrations, error) {
 			continue
 		}
 
-		file, err := ioutil.ReadFile(filepath.Join(dir, f.Name()))
+		fileName := f.Name()
+
+		file, err := ioutil.ReadFile(filepath.Join(dir, fileName))
 		if err != nil {
 			continue
 		}
@@ -121,6 +127,11 @@ func LoadMigrations(dir string) (Migrations, error) {
 			Statements: statements,
 			kind:       kind,
 		})
+
+		if prevFileName, ok := versions[version]; ok {
+			return nil, fmt.Errorf("colliding version number \"%d\" between file names \"%s\" and \"%s\"", version, prevFileName, fileName)
+		}
+		versions[version] = fileName
 	}
 
 	return migrations, nil
