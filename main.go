@@ -20,9 +20,13 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/cloudspannerecosystem/wrench/cmd"
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
@@ -33,12 +37,15 @@ func main() {
 }
 
 func execute() {
-	handleError(cmd.Execute())
+	ctx, cancel := signal.NotifyContext(context.Background(), unix.SIGINT, unix.SIGTERM)
+	defer cancel()
+
+	handleError(cmd.Execute(ctx))
 }
 
 func handleError(err error) {
 	if err != nil {
-		fmt.Fprint(os.Stderr, (fmt.Sprintf("%s\n\t%s\n", err.Error(), errorDetails(err))))
+		fmt.Fprintf(os.Stderr, "%s\n\t%s\n", err.Error(), errorDetails(err))
 		os.Exit(1)
 	}
 }

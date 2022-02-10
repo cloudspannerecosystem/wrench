@@ -1,4 +1,4 @@
-version = "1.0.3"
+version = "1.0.4"
 
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "nogo")
 load("@bazel_gazelle//:def.bzl", "gazelle")
@@ -6,6 +6,7 @@ load("@io_bazel_rules_docker//go:image.bzl", "go_image")
 load("@io_bazel_rules_docker//container:container.bzl", "container_push")
 
 # gazelle:prefix github.com/cloudspannerecosystem/wrench
+# gazelle:proto disable_global
 gazelle(name = "gazelle")
 
 nogo(
@@ -30,6 +31,7 @@ go_library(
     deps = [
         "//cmd:go_default_library",
         "//pkg/spanner:go_default_library",
+        "@org_golang_x_sys//unix:go_default_library",
     ],
 )
 

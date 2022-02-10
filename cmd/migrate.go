@@ -20,7 +20,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -107,7 +106,7 @@ func migrateCreate(c *cobra.Command, args []string) error {
 }
 
 func migrateUp(c *cobra.Command, args []string) error {
-	ctx := context.Background()
+	ctx := c.Context()
 
 	limit := -1
 	if len(args) > 0 {
@@ -147,7 +146,7 @@ func migrateUp(c *cobra.Command, args []string) error {
 }
 
 func migrateVersion(c *cobra.Command, args []string) error {
-	ctx := context.Background()
+	ctx := c.Context()
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
@@ -181,7 +180,7 @@ func migrateVersion(c *cobra.Command, args []string) error {
 }
 
 func migrateSet(c *cobra.Command, args []string) error {
-	ctx := context.Background()
+	ctx := c.Context()
 
 	if len(args) == 0 {
 		return &Error{

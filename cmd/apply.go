@@ -20,18 +20,20 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
 
 	"github.com/spf13/cobra"
+
+	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 )
 
 var (
 	ddlFile     string
 	dmlFile     string
 	partitioned bool
+	priority    string
 )
 
 var applyCmd = &cobra.Command{
@@ -41,7 +43,7 @@ var applyCmd = &cobra.Command{
 }
 
 func apply(c *cobra.Command, _ []string) error {
-	ctx := context.Background()
+	ctx := c.Context()
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
@@ -86,7 +88,15 @@ func apply(c *cobra.Command, _ []string) error {
 		}
 	}
 
-	numAffectedRows, err := client.ApplyDMLFile(ctx, dml, partitioned)
+	p, err := priorityTypeOf(priority)
+	if err != nil {
+		return &Error{
+			err: err,
+			cmd: c,
+		}
+	}
+
+	numAffectedRows, err := client.ApplyDMLFile(ctx, dml, partitioned, p)
 	if err != nil {
 		return &Error{
 			err: err,
@@ -98,8 +108,34 @@ func apply(c *cobra.Command, _ []string) error {
 	return nil
 }
 
+const (
+	priorityTypeHigh   = "high"
+	priorityTypeMedium = "medium"
+	priorityTypeLow    = "low"
+)
+
+func priorityTypeOf(prioirty string) (spanner.PriorityType, error) {
+	switch prioirty {
+	case priorityTypeHigh:
+		return spanner.PriorityTypeHigh, nil
+	case priorityTypeMedium:
+		return spanner.PriorityTypeMedium, nil
+	case priorityTypeLow:
+		return spanner.PriorityTypeLow, nil
+	case "":
+		return spanner.PriorityTypeUnspecified, nil
+	default:
+		return 0, fmt.Errorf(
+			"%s is unsupported priority, it must be one of %s, %s, or %s",
+			priority, priorityTypeHigh, priorityTypeMedium, priorityTypeLow,
+		)
+	}
+
+}
+
 func init() {
 	applyCmd.PersistentFlags().StringVar(&ddlFile, flagDDLFile, "", "DDL file to be applied")
 	applyCmd.PersistentFlags().StringVar(&dmlFile, flagDMLFile, "", "DML file to be applied")
 	applyCmd.PersistentFlags().BoolVar(&partitioned, flagPartitioned, false, "Whether given DML should be executed as a Partitioned-DML or not")
+	applyCmd.PersistentFlags().StringVar(&priority, flagPriority, "", "The priority to apply DML(optional)")
 }

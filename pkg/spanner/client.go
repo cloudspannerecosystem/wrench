@@ -26,11 +26,12 @@ import (
 	"sort"
 
 	"cloud.google.com/go/spanner"
-	admin "cloud.google.com/go/spanner/admin/database/apiv1"
+	databasev1 "cloud.google.com/go/spanner/admin/database/apiv1"
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	databasepb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
+	sppb "google.golang.org/genproto/googleapis/spanner/v1"
 )
 
 const (
@@ -44,7 +45,7 @@ type table struct {
 type Client struct {
 	config             *Config
 	spannerClient      *spanner.Client
-	spannerAdminClient *admin.DatabaseAdminClient
+	spannerAdminClient *databasev1.DatabaseAdminClient
 }
 
 func NewClient(ctx context.Context, config *Config) (*Client, error) {
@@ -57,11 +58,11 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 	if err != nil {
 		return nil, &Error{
 			Code: ErrorCodeCreateClient,
-			err:  err,
+			err:  fmt.Errorf("failed to create spanner client: %w", err),
 		}
 	}
 
-	spannerAdminClient, err := admin.NewDatabaseAdminClient(ctx, opts...)
+	spannerAdminClient, err := databasev1.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		spannerClient.Close()
 		return nil, &Error{
@@ -217,18 +218,28 @@ func (c *Client) ApplyDDL(ctx context.Context, statements []string) error {
 	return nil
 }
 
-func (c *Client) ApplyDMLFile(ctx context.Context, ddl []byte, partitioned bool) (int64, error) {
+type PriorityType int
+
+const (
+	PriorityTypeUnspecified PriorityType = iota
+	PriorityTypeHigh
+	PriorityTypeMedium
+	PriorityTypeLow
+)
+
+func (c *Client) ApplyDMLFile(ctx context.Context, ddl []byte, partitioned bool, priority PriorityType) (int64, error) {
 	statements := toStatements(ddl)
 
 	if partitioned {
-		return c.ApplyPartitionedDML(ctx, statements)
+		return c.ApplyPartitionedDML(ctx, statements, priority)
 	}
-	return c.ApplyDML(ctx, statements)
+	return c.ApplyDML(ctx, statements, priority)
 }
 
-func (c *Client) ApplyDML(ctx context.Context, statements []string) (int64, error) {
+func (c *Client) ApplyDML(ctx context.Context, statements []string, priority PriorityType) (int64, error) {
+	p := priorityPBOf(priority)
 	numAffectedRows := int64(0)
-	_, err := c.spannerClient.ReadWriteTransaction(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
+	_, err := c.spannerClient.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
 		for _, s := range statements {
 			num, err := tx.Update(ctx, spanner.Statement{
 				SQL: s,
@@ -239,6 +250,8 @@ func (c *Client) ApplyDML(ctx context.Context, statements []string) (int64, erro
 			numAffectedRows += num
 		}
 		return nil
+	}, spanner.TransactionOptions{
+		CommitPriority: p,
 	})
 	if err != nil {
 		return 0, &Error{
@@ -250,12 +263,14 @@ func (c *Client) ApplyDML(ctx context.Context, statements []string) (int64, erro
 	return numAffectedRows, nil
 }
 
-func (c *Client) ApplyPartitionedDML(ctx context.Context, statements []string) (int64, error) {
+func (c *Client) ApplyPartitionedDML(ctx context.Context, statements []string, priority PriorityType) (int64, error) {
+	p := priorityPBOf(priority)
 	numAffectedRows := int64(0)
-
 	for _, s := range statements {
-		num, err := c.spannerClient.PartitionedUpdate(ctx, spanner.Statement{
+		num, err := c.spannerClient.PartitionedUpdateWithOptions(ctx, spanner.Statement{
 			SQL: s,
+		}, spanner.QueryOptions{
+			Priority: p,
 		})
 		if err != nil {
 			return numAffectedRows, &Error{
@@ -287,7 +302,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 	if dirty {
 		return &Error{
 			Code: ErrorCodeMigrationVersionDirty,
-			err:  fmt.Errorf("Database version: %d is dirty, please fix it.", version),
+			err:  fmt.Errorf("database version: %d is dirty, please fix it", version),
 		}
 	}
 
@@ -317,7 +332,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 				}
 			}
 		case statementKindDML:
-			if _, err := c.ApplyPartitionedDML(ctx, m.Statements); err != nil {
+			if _, err := c.ApplyPartitionedDML(ctx, m.Statements, PriorityTypeUnspecified); err != nil {
 				return &Error{
 					Code: ErrorCodeExecuteMigrations,
 					err:  err,
@@ -326,7 +341,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 		default:
 			return &Error{
 				Code: ErrorCodeExecuteMigrations,
-				err:  fmt.Errorf("Unknown query type, version: %d", m.Version),
+				err:  fmt.Errorf("unknown query type, version: %d", m.Version),
 			}
 		}
 
@@ -365,10 +380,10 @@ func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string
 
 	row, err := iter.Next()
 	if err != nil {
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			return 0, false, &Error{
 				Code: ErrorCodeNoMigration,
-				err:  errors.New("No migration."),
+				err:  errors.New("no migration"),
 			}
 		}
 		return 0, false, &Error{
@@ -392,7 +407,7 @@ func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string
 }
 
 func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, dirty bool, tableName string) error {
-	_, err := c.spannerClient.ReadWriteTransaction(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
+	_, err := c.spannerClient.ReadWriteTransaction(ctx, func(_ context.Context, tx *spanner.ReadWriteTransaction) error {
 		m := []*spanner.Mutation{
 			spanner.Delete(tableName, spanner.AllKeys()),
 			spanner.Insert(
@@ -440,4 +455,19 @@ func (c *Client) Close() error {
 	}
 
 	return nil
+}
+
+func priorityPBOf(priority PriorityType) sppb.RequestOptions_Priority {
+	switch priority {
+	case PriorityTypeHigh:
+		return sppb.RequestOptions_PRIORITY_HIGH
+	case PriorityTypeMedium:
+		return sppb.RequestOptions_PRIORITY_MEDIUM
+	case PriorityTypeLow:
+		return sppb.RequestOptions_PRIORITY_LOW
+	case PriorityTypeUnspecified:
+		return sppb.RequestOptions_PRIORITY_UNSPECIFIED
+	default:
+		return sppb.RequestOptions_PRIORITY_UNSPECIFIED
+	}
 }
