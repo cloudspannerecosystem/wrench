@@ -239,20 +239,30 @@ func (c *Client) ApplyDMLFile(ctx context.Context, ddl []byte, partitioned bool,
 func (c *Client) ApplyDML(ctx context.Context, statements []string, priority PriorityType) (int64, error) {
 	p := priorityPBOf(priority)
 	numAffectedRows := int64(0)
-	_, err := c.spannerClient.ReadWriteTransactionWithOptions(ctx, func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
-		for _, s := range statements {
-			num, err := tx.Update(ctx, spanner.Statement{
-				SQL: s,
+	_, err := c.spannerClient.ReadWriteTransactionWithOptions(
+		ctx,
+		func(ctx context.Context, tx *spanner.ReadWriteTransaction) error {
+			stmts := make([]spanner.Statement, len(statements))
+			for i, s := range statements {
+				stmts[i] = spanner.Statement{SQL: s}
+			}
+			counts, err := tx.BatchUpdateWithOptions(ctx, stmts, spanner.QueryOptions{
+				Priority: p,
 			})
 			if err != nil {
 				return err
 			}
-			numAffectedRows += num
-		}
-		return nil
-	}, spanner.TransactionOptions{
-		CommitPriority: p,
-	})
+
+			for _, num := range counts {
+				numAffectedRows += num
+			}
+
+			return nil
+		},
+		spanner.TransactionOptions{
+			CommitPriority: p,
+		},
+	)
 	if err != nil {
 		return 0, &Error{
 			Code: ErrorCodeUpdateDML,
