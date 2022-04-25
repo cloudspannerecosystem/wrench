@@ -221,7 +221,7 @@ func TestExecuteMigrations(t *testing.T) {
 	}
 
 	// only apply 000002.sql by specifying limit 1.
-	if err := client.ExecuteMigrations(ctx, migrations, 1, migrationTable); err != nil {
+	if err := client.ExecuteMigrations(ctx, migrations, 1); err != nil {
 		t.Fatalf("failed to execute migration: %v", err)
 	}
 
@@ -229,7 +229,7 @@ func TestExecuteMigrations(t *testing.T) {
 	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "YES")
 	ensureMigrationVersionRecord(t, ctx, client, 2, false)
 
-	if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable); err != nil {
+	if err := client.ExecuteMigrations(ctx, migrations, len(migrations)); err != nil {
 		t.Fatalf("failed to execute migration: %v", err)
 	}
 
@@ -314,7 +314,7 @@ func TestGetSchemaMigrationVersion(t *testing.T) {
 		t.Fatalf("failed to apply mutation: %v", err)
 	}
 
-	v, d, err := client.GetSchemaMigrationVersion(ctx, migrationTable)
+	v, d, err := client.GetSchemaMigrationVersion(ctx)
 	if err != nil {
 		t.Fatalf("failed to get version: %v", err)
 	}
@@ -350,7 +350,7 @@ func TestSetSchemaMigrationVersion(t *testing.T) {
 	nextVersion := 2
 	nextDirty := true
 
-	if err := client.SetSchemaMigrationVersion(ctx, uint(nextVersion), nextDirty, migrationTable); err != nil {
+	if err := client.SetSchemaMigrationVersion(ctx, uint(nextVersion), nextDirty); err != nil {
 		t.Fatalf("failed to set version: %v", err)
 	}
 
@@ -360,8 +360,6 @@ func TestSetSchemaMigrationVersion(t *testing.T) {
 func TestEnsureMigrationTable(t *testing.T) {
 	ctx := context.Background()
 
-	client, done := testClientWithDatabase(t, ctx)
-	defer done()
 
 	tests := map[string]struct {
 		table string
@@ -372,7 +370,12 @@ func TestEnsureMigrationTable(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := client.EnsureMigrationTable(ctx, test.table); err != nil {
+			cfg := &Config{
+				MigrationTableName: test.table,
+			}
+			client, done := testConfiguredClientWithDatabase(t, ctx, cfg)
+			defer done()
+			if err := client.EnsureMigrationTable(ctx); err != nil {
 				t.Fatalf("failed to ensure migration table: %v", err)
 			}
 
@@ -434,7 +437,12 @@ func TestPriorityPBOf(t *testing.T) {
 
 }
 
+
 func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func()) {
+	return testConfiguredClientWithDatabase(t, ctx, &Config{})
+}
+
+func testConfiguredClientWithDatabase(t *testing.T, ctx context.Context, config *Config) (*Client, func()) {
 	t.Helper()
 
 	project := os.Getenv(envSpannerProjectID)
@@ -454,13 +462,25 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 		database = fmt.Sprintf("wrench-test-%s", id.String()[:8])
 	}
 
-	config := &Config{
+	mergedConfig := &Config{
 		Project:  project,
 		Instance: instance,
 		Database: database,
 	}
+	if config != nil && config.Project != "" {
+		mergedConfig.Project = config.Project
+	}
+	if config != nil && config.Instance != "" {
+		mergedConfig.Instance = config.Instance
+	}
+	if config != nil && config.Database != "" {
+		mergedConfig.Database = config.Database
+	}
+	if config != nil && config.MigrationTableName != "" {
+		mergedConfig.MigrationTableName = config.MigrationTableName
+	}
 
-	client, err := NewClient(ctx, config)
+	client, err := NewClient(ctx, mergedConfig)
 	if err != nil {
 		t.Fatalf("failed to create spanner client: %v", err)
 	}
