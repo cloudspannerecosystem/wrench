@@ -36,6 +36,7 @@ import (
 
 const (
 	ddlStatementsSeparator = ";"
+	defaultMigrationTableName = "SchemaMigrations"
 )
 
 type table struct {
@@ -76,6 +77,13 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 		spannerClient:      spannerClient,
 		spannerAdminClient: spannerAdminClient,
 	}, nil
+}
+
+func (c *Client) migrationTableName() string {
+	if c.config == nil || c.config.MigrationTableName == "" {
+		return defaultMigrationTableName
+	}
+	return c.config.MigrationTableName
 }
 
 func (c *Client) CreateDatabase(ctx context.Context, ddl []byte) error {
@@ -131,7 +139,7 @@ func (c *Client) TruncateAllTables(ctx context.Context) error {
 			return err
 		}
 
-		if t.TableName == "SchemaMigrations" {
+		if t.TableName == c.migrationTableName() {
 			return nil
 		}
 
@@ -295,10 +303,10 @@ func (c *Client) ApplyPartitionedDML(ctx context.Context, statements []string, p
 	return numAffectedRows, nil
 }
 
-func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, limit int, tableName string) error {
+func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, limit int) error {
 	sort.Sort(migrations)
 
-	version, dirty, err := c.GetSchemaMigrationVersion(ctx, tableName)
+	version, dirty, err := c.GetSchemaMigrationVersion(ctx)
 	if err != nil {
 		var se *Error
 		if !errors.As(err, &se) || se.Code != ErrorCodeNoMigration {
@@ -326,7 +334,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 			continue
 		}
 
-		if err := c.SetSchemaMigrationVersion(ctx, m.Version, true, tableName); err != nil {
+		if err := c.SetSchemaMigrationVersion(ctx, m.Version, true); err != nil {
 			return &Error{
 				Code: ErrorCodeExecuteMigrations,
 				err:  err,
@@ -361,7 +369,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 			fmt.Printf("%d/up\n", m.Version)
 		}
 
-		if err := c.SetSchemaMigrationVersion(ctx, m.Version, false, tableName); err != nil {
+		if err := c.SetSchemaMigrationVersion(ctx, m.Version, false); err != nil {
 			return &Error{
 				Code: ErrorCodeExecuteMigrations,
 				err:  err,
@@ -381,7 +389,8 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 	return nil
 }
 
-func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string) (uint, bool, error) {
+func (c *Client) GetSchemaMigrationVersion(ctx context.Context) (uint, bool, error) {
+	tableName := c.migrationTableName()
 	stmt := spanner.Statement{
 		SQL: `SELECT Version, Dirty FROM ` + tableName + ` LIMIT 1`,
 	}
@@ -416,7 +425,8 @@ func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string
 	return uint(v), dirty, nil
 }
 
-func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, dirty bool, tableName string) error {
+func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, dirty bool) error {
+	tableName := c.migrationTableName()
 	_, err := c.spannerClient.ReadWriteTransaction(ctx, func(_ context.Context, tx *spanner.ReadWriteTransaction) error {
 		m := []*spanner.Mutation{
 			spanner.Delete(tableName, spanner.AllKeys()),
@@ -438,7 +448,8 @@ func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, di
 	return nil
 }
 
-func (c *Client) EnsureMigrationTable(ctx context.Context, tableName string) error {
+func (c *Client) EnsureMigrationTable(ctx context.Context) error {
+	tableName := c.migrationTableName()
 	iter := c.spannerClient.Single().Read(ctx, tableName, spanner.AllKeys(), []string{"Version"})
 	err := iter.Do(func(r *spanner.Row) error {
 		return nil

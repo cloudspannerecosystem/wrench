@@ -45,10 +45,11 @@ const (
 
 func newSpannerClient(ctx context.Context, c *cobra.Command) (*spanner.Client, error) {
 	config := &spanner.Config{
-		Project:         c.Flag(flagNameProject).Value.String(),
-		Instance:        c.Flag(flagNameInstance).Value.String(),
-		Database:        c.Flag(flagNameDatabase).Value.String(),
-		CredentialsFile: c.Flag(flagCredentialsFile).Value.String(),
+		Project:            c.Flag(flagNameProject).Value.String(),
+		Instance:           c.Flag(flagNameInstance).Value.String(),
+		Database:           c.Flag(flagNameDatabase).Value.String(),
+		CredentialsFile:    c.Flag(flagCredentialsFile).Value.String(),
+		MigrationTableName: "", // use pkg.spanner default
 	}
 
 	client, err := spanner.NewClient(ctx, config)

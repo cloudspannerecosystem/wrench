@@ -22,10 +22,11 @@ package spanner
 import "fmt"
 
 type Config struct {
-	Project         string
-	Instance        string
-	Database        string
-	CredentialsFile string
+	Project            string
+	Instance           string
+	Database           string
+	CredentialsFile    string
+	MigrationTableName string
 }
 
 func (c *Config) URL() string {
