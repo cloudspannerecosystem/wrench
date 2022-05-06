@@ -40,7 +40,8 @@ func create(c *cobra.Command, _ []string) error {
 	}
 	defer client.Close()
 
-	ddl, err := ioutil.ReadFile(schemaFilePath(c))
+	filename := schemaFilePath(c)
+	ddl, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return &Error{
 			err: err,
@@ -48,7 +49,7 @@ func create(c *cobra.Command, _ []string) error {
 		}
 	}
 
-	err = client.CreateDatabase(ctx, ddl)
+	err = client.CreateDatabase(ctx, filename, ddl)
 	if err != nil {
 		return &Error{
 			err: err,

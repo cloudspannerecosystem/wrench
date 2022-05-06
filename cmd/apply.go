@@ -64,7 +64,7 @@ func apply(c *cobra.Command, _ []string) error {
 			}
 		}
 
-		err = client.ApplyDDLFile(ctx, ddl)
+		err = client.ApplyDDLFile(ctx, ddlFile, ddl)
 		if err != nil {
 			return &Error{
 				err: err,
@@ -96,7 +96,7 @@ func apply(c *cobra.Command, _ []string) error {
 		}
 	}
 
-	numAffectedRows, err := client.ApplyDMLFile(ctx, dml, partitioned, p)
+	numAffectedRows, err := client.ApplyDMLFile(ctx, ddlFile, dml, partitioned, p)
 	if err != nil {
 		return &Error{
 			err: err,

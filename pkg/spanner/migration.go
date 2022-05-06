@@ -20,14 +20,14 @@
 package spanner
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
+
+	"cloud.google.com/go/spanner/spansql"
 )
 
 const (
@@ -115,7 +115,11 @@ func LoadMigrations(dir string) (Migrations, error) {
 			continue
 		}
 
-		statements := toStatements(file)
+		statements, err := toStatements(f.Name(), file)
+		if err != nil {
+			return nil, err
+		}
+
 		kind, err := inspectStatementsKind(statements)
 		if err != nil {
 			return nil, err
@@ -137,17 +141,18 @@ func LoadMigrations(dir string) (Migrations, error) {
 	return migrations, nil
 }
 
-func toStatements(file []byte) []string {
-	contents := bytes.Split(file, []byte(statementsSeparator))
-
-	statements := make([]string, 0, len(contents))
-	for _, c := range contents {
-		if statement := strings.TrimSpace(string(c)); statement != "" {
-			statements = append(statements, statement)
-		}
+func toStatements(filename string, data []byte) ([]string, error) {
+	ddl, err := spansql.ParseDDL(filename, string(data))
+	if err != nil {
+		return nil, err
 	}
 
-	return statements
+	var statements []string
+	for _, stmt := range ddl.List {
+		statements = append(statements, stmt.SQL())
+	}
+
+	return statements, nil
 }
 
 func inspectStatementsKind(statements []string) (statementKind, error) {
