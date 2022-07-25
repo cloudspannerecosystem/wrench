@@ -79,7 +79,7 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 }
 
 func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte) error {
-	statements, err := toStatements(filename, ddl)
+	statements, err := ddlToStatements(filename, ddl)
 	if err != nil {
 		return &Error{
 			Code: ErrorCodeLoadSchema,
@@ -196,7 +196,7 @@ func (c *Client) LoadDDL(ctx context.Context) ([]byte, error) {
 }
 
 func (c *Client) ApplyDDLFile(ctx context.Context, filename string, ddl []byte) error {
-	statements, err := toStatements(filename, ddl)
+	statements, err := ddlToStatements(filename, ddl)
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,7 @@ const (
 )
 
 func (c *Client) ApplyDMLFile(ctx context.Context, filename string, ddl []byte, partitioned bool, priority PriorityType) (int64, error) {
-	statements, err := toStatements(filename, ddl)
+	statements, err := dmlToStatements(filename, ddl)
 	if err != nil {
 		return 0, err
 	}

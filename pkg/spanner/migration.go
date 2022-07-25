@@ -115,7 +115,7 @@ func LoadMigrations(dir string) (Migrations, error) {
 			continue
 		}
 
-		statements, err := toStatements(f.Name(), file)
+		statements, err := ddlToStatements(f.Name(), file)
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +141,7 @@ func LoadMigrations(dir string) (Migrations, error) {
 	return migrations, nil
 }
 
-func toStatements(filename string, data []byte) ([]string, error) {
+func ddlToStatements(filename string, data []byte) ([]string, error) {
 	ddl, err := spansql.ParseDDL(filename, string(data))
 	if err != nil {
 		return nil, err
@@ -149,6 +149,20 @@ func toStatements(filename string, data []byte) ([]string, error) {
 
 	var statements []string
 	for _, stmt := range ddl.List {
+		statements = append(statements, stmt.SQL())
+	}
+
+	return statements, nil
+}
+
+func dmlToStatements(filename string, data []byte) ([]string, error) {
+	dml, err := spansql.ParseDML(filename, string(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var statements []string
+	for _, stmt := range dml.List {
 		statements = append(statements, stmt.SQL())
 	}
 
