@@ -923,8 +923,8 @@ def wrench_deps():
         name = "com_google_cloud_go_spanner",
         build_file_proto_mode = "disable_global",
         importpath = "cloud.google.com/go/spanner",
-        sum = "h1:m5j2NgeCn9/ESElubpSCAdEghvWiuLc9n7hylaKAEMk=",
-        version = "v1.35.1-0.20220723171336-09e96ce1076d",
+        sum = "h1:MYc3fKJlZZCpZymoKBqPR23Hxd1CFhH+zsQPMzeM1xI=",
+        version = "v1.36.0",
     )
     go_repository(
         name = "com_google_cloud_go_storage",

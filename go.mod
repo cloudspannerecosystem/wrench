@@ -3,7 +3,7 @@ module github.com/cloudspannerecosystem/wrench
 go 1.16
 
 require (
-	cloud.google.com/go/spanner v1.35.1-0.20220723171336-09e96ce1076d
+	cloud.google.com/go/spanner v1.36.0
 	github.com/bazelbuild/bazelisk v0.0.8
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-multierror v1.1.1
