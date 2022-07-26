@@ -13,12 +13,13 @@ nogo(
     name = "nogo",
     visibility = ["//visibility:public"],
     deps = [
-        "@org_golang_x_tools//go/analysis/passes/atomic:go_tool_library",
-        "@org_golang_x_tools//go/analysis/passes/bools:go_tool_library",
-        "@org_golang_x_tools//go/analysis/passes/buildtag:go_tool_library",
-        "@org_golang_x_tools//go/analysis/passes/nilfunc:go_tool_library",
-        "@org_golang_x_tools//go/analysis/passes/printf:go_tool_library",
-        "@org_golang_x_tools//go/analysis/passes/structtag:go_tool_library",
+        # for now, some analyzers are not working: https://github.com/bazelbuild/rules_go/issues/3230
+        "@org_golang_x_tools//go/analysis/passes/atomic:go_default_library",
+        # "@org_golang_x_tools//go/analysis/passes/bools:go_default_library",
+        # "@org_golang_x_tools//go/analysis/passes/buildtag:go_default_library",
+        # "@org_golang_x_tools//go/analysis/passes/nilfunc:go_default_library",
+        # "@org_golang_x_tools//go/analysis/passes/printf:go_default_library",
+        "@org_golang_x_tools//go/analysis/passes/structtag:go_default_library",
     ],
 )
 
