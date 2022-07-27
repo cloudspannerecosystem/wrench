@@ -93,7 +93,7 @@ func TestApplyDDLFile(t *testing.T) {
 	client, done := testClientWithDatabase(t, ctx)
 	defer done()
 
-	if err := client.ApplyDDLFile(ctx, ddl); err != nil {
+	if err := client.ApplyDDLFile(ctx, "testdata/ddl.sql", ddl); err != nil {
 		t.Fatalf("failed to apply ddl file: %v", err)
 	}
 
@@ -172,7 +172,7 @@ func TestApplyDMLFile(t *testing.T) {
 				t.Fatalf("failed to read dml file: %v", err)
 			}
 
-			n, err := client.ApplyDMLFile(ctx, dml, test.partitioned, test.priority)
+			n, err := client.ApplyDMLFile(ctx, "testdata/dml.sql", dml, test.partitioned, test.priority)
 			if err != nil {
 				t.Fatalf("failed to apply dml file: %v", err)
 			}
@@ -470,7 +470,7 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 		t.Fatalf("failed to read schema file: %v", err)
 	}
 
-	if err := client.CreateDatabase(ctx, ddl); err != nil {
+	if err := client.CreateDatabase(ctx, "testdata/schema.sql", ddl); err != nil {
 		t.Fatalf("failed to create database: %v", err)
 	}
 

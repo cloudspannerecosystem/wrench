@@ -24,9 +24,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"github.com/spf13/cobra"
-
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -53,7 +52,7 @@ func apply(c *cobra.Command, _ []string) error {
 
 	if ddlFile != "" {
 		if dmlFile != "" {
-			return errors.New("Cannot specify DDL and DML at same time.")
+			return errors.New("cannot specify DDL and DML at same time")
 		}
 
 		ddl, err := ioutil.ReadFile(ddlFile)
@@ -64,7 +63,7 @@ func apply(c *cobra.Command, _ []string) error {
 			}
 		}
 
-		err = client.ApplyDDLFile(ctx, ddl)
+		err = client.ApplyDDLFile(ctx, ddlFile, ddl)
 		if err != nil {
 			return &Error{
 				err: err,
@@ -96,7 +95,7 @@ func apply(c *cobra.Command, _ []string) error {
 		}
 	}
 
-	numAffectedRows, err := client.ApplyDMLFile(ctx, dml, partitioned, p)
+	numAffectedRows, err := client.ApplyDMLFile(ctx, dmlFile, dml, partitioned, p)
 	if err != nil {
 		return &Error{
 			err: err,
@@ -130,7 +129,6 @@ func priorityTypeOf(prioirty string) (spanner.PriorityType, error) {
 			priority, priorityTypeHigh, priorityTypeMedium, priorityTypeLow,
 		)
 	}
-
 }
 
 func init() {

@@ -20,18 +20,14 @@
 package spanner
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
-)
 
-const (
-	statementsSeparator = ";"
+	"cloud.google.com/go/spanner/spansql"
 )
 
 var (
@@ -115,7 +111,15 @@ func LoadMigrations(dir string) (Migrations, error) {
 			continue
 		}
 
-		statements := toStatements(file)
+		statements, err := ddlToStatements(f.Name(), file)
+		if err != nil {
+			nstatements, nerr := dmlToStatements(f.Name(), file)
+			if nerr != nil {
+				return nil, errors.New("failed to parse DDL/DML statements")
+			}
+			statements = nstatements
+		}
+
 		kind, err := inspectStatementsKind(statements)
 		if err != nil {
 			return nil, err
@@ -137,17 +141,32 @@ func LoadMigrations(dir string) (Migrations, error) {
 	return migrations, nil
 }
 
-func toStatements(file []byte) []string {
-	contents := bytes.Split(file, []byte(statementsSeparator))
-
-	statements := make([]string, 0, len(contents))
-	for _, c := range contents {
-		if statement := strings.TrimSpace(string(c)); statement != "" {
-			statements = append(statements, statement)
-		}
+func ddlToStatements(filename string, data []byte) ([]string, error) {
+	ddl, err := spansql.ParseDDL(filename, string(data))
+	if err != nil {
+		return nil, err
 	}
 
-	return statements
+	var statements []string
+	for _, stmt := range ddl.List {
+		statements = append(statements, stmt.SQL())
+	}
+
+	return statements, nil
+}
+
+func dmlToStatements(filename string, data []byte) ([]string, error) {
+	dml, err := spansql.ParseDML(filename, string(data))
+	if err != nil {
+		return nil, err
+	}
+
+	var statements []string
+	for _, stmt := range dml.List {
+		statements = append(statements, stmt.SQL())
+	}
+
+	return statements, nil
 }
 
 func inspectStatementsKind(statements []string) (statementKind, error) {
@@ -166,7 +185,7 @@ func inspectStatementsKind(statements []string) (statementKind, error) {
 
 	if kindMap[statementKindDML] > 0 {
 		if kindMap[statementKindDDL] > 0 {
-			return "", errors.New("Cannot specify DDL and DML at same migration file.")
+			return "", errors.New("cannot specify DDL and DML at same migration file")
 		}
 
 		return statementKindDML, nil

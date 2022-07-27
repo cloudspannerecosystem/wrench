@@ -78,8 +78,14 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) CreateDatabase(ctx context.Context, ddl []byte) error {
-	statements := toStatements(ddl)
+func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte) error {
+	statements, err := ddlToStatements(filename, ddl)
+	if err != nil {
+		return &Error{
+			Code: ErrorCodeLoadSchema,
+			err:  err,
+		}
+	}
 
 	createReq := &databasepb.CreateDatabaseRequest{
 		Parent:          fmt.Sprintf("projects/%s/instances/%s", c.config.Project, c.config.Instance),
@@ -189,8 +195,13 @@ func (c *Client) LoadDDL(ctx context.Context) ([]byte, error) {
 	return schema, nil
 }
 
-func (c *Client) ApplyDDLFile(ctx context.Context, ddl []byte) error {
-	return c.ApplyDDL(ctx, toStatements(ddl))
+func (c *Client) ApplyDDLFile(ctx context.Context, filename string, ddl []byte) error {
+	statements, err := ddlToStatements(filename, ddl)
+	if err != nil {
+		return err
+	}
+
+	return c.ApplyDDL(ctx, statements)
 }
 
 func (c *Client) ApplyDDL(ctx context.Context, statements []string) error {
@@ -227,8 +238,11 @@ const (
 	PriorityTypeLow
 )
 
-func (c *Client) ApplyDMLFile(ctx context.Context, ddl []byte, partitioned bool, priority PriorityType) (int64, error) {
-	statements := toStatements(ddl)
+func (c *Client) ApplyDMLFile(ctx context.Context, filename string, ddl []byte, partitioned bool, priority PriorityType) (int64, error) {
+	statements, err := dmlToStatements(filename, ddl)
+	if err != nil {
+		return 0, err
+	}
 
 	if partitioned {
 		return c.ApplyPartitionedDML(ctx, statements, priority)
