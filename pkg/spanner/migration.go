@@ -30,10 +30,6 @@ import (
 	"cloud.google.com/go/spanner/spansql"
 )
 
-const (
-	statementsSeparator = ";"
-)
-
 var (
 	// migrationFileRegex matches the following patterns
 	// 001.sql
@@ -117,7 +113,11 @@ func LoadMigrations(dir string) (Migrations, error) {
 
 		statements, err := ddlToStatements(f.Name(), file)
 		if err != nil {
-			return nil, err
+			nstatements, nerr := dmlToStatements(f.Name(), file)
+			if nerr != nil {
+				return nil, errors.New("failed to parse DDL/DML statements")
+			}
+			statements = nstatements
 		}
 
 		kind, err := inspectStatementsKind(statements)
@@ -185,7 +185,7 @@ func inspectStatementsKind(statements []string) (statementKind, error) {
 
 	if kindMap[statementKindDML] > 0 {
 		if kindMap[statementKindDDL] > 0 {
-			return "", errors.New("Cannot specify DDL and DML at same migration file.")
+			return "", errors.New("cannot specify DDL and DML at same migration file")
 		}
 
 		return statementKindDML, nil
