@@ -27,6 +27,17 @@ dep: bin/bazelisk
 build: bin/bazelisk
 	bin/bazelisk build //:wrench
 
+.PHONY: binaries
+binaries:
+	bin/bazelisk build --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 //:wrench
+	cp -f ./bazel-bin/wrench_/wrench ./bin/wrench_linux_amd64
+	bin/bazelisk build --platforms=@io_bazel_rules_go//go/toolchain:linux_arm64 //:wrench
+	cp -f ./bazel-bin/wrench_/wrench ./bin/wrench_linux_arm64
+	bin/bazelisk build --platforms=@io_bazel_rules_go//go/toolchain:darwin_amd64 //:wrench
+	cp -f ./bazel-bin/wrench_/wrench ./bin/wrench_darwin_amd64
+	bin/bazelisk build --platforms=@io_bazel_rules_go//go/toolchain:darwin_arm64 //:wrench
+	cp -f ./bazel-bin/wrench_/wrench ./bin/wrench_darwin_arm64
+
 .PHONY: image
 image: bin/bazelisk
 	bin/bazelisk build --platforms=@io_bazel_rules_go//go/toolchain:linux_amd64 //:image
