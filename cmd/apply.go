@@ -20,9 +20,11 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
@@ -33,6 +35,7 @@ var (
 	dmlFile     string
 	partitioned bool
 	priority    string
+	timeout     time.Duration
 )
 
 var applyCmd = &cobra.Command{
@@ -43,6 +46,12 @@ var applyCmd = &cobra.Command{
 
 func apply(c *cobra.Command, _ []string) error {
 	ctx := c.Context()
+
+	if timeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
@@ -136,4 +145,5 @@ func init() {
 	applyCmd.PersistentFlags().StringVar(&dmlFile, flagDMLFile, "", "DML file to be applied")
 	applyCmd.PersistentFlags().BoolVar(&partitioned, flagPartitioned, false, "Whether given DML should be executed as a Partitioned-DML or not")
 	applyCmd.PersistentFlags().StringVar(&priority, flagPriority, "", "The priority to apply DML(optional)")
+	applyCmd.PersistentFlags().DurationVar(&timeout, flagTimeout, 0, "The timeout when applying DML(optional)")
 }
