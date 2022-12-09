@@ -40,6 +40,7 @@ const (
 	flagPartitioned       = "partitioned"
 	flagPriority          = "priority"
 	flagNode              = "node"
+	flagTimeout           = "timeout"
 	defaultSchemaFileName = "schema.sql"
 )
 

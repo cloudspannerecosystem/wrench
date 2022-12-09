@@ -20,6 +20,7 @@
 package cmd
 
 import (
+	"context"
 	"io/ioutil"
 
 	"github.com/spf13/cobra"
@@ -31,8 +32,9 @@ var loadCmd = &cobra.Command{
 	RunE:  load,
 }
 
-func load(c *cobra.Command, args []string) error {
-	ctx := c.Context()
+func load(c *cobra.Command, _ []string) error {
+	ctx, cancel := context.WithTimeout(c.Context(), timeout)
+	defer cancel()
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
@@ -48,7 +50,7 @@ func load(c *cobra.Command, args []string) error {
 		}
 	}
 
-	err = ioutil.WriteFile(schemaFilePath(c), ddl, 0664)
+	err = ioutil.WriteFile(schemaFilePath(c), ddl, 0o664)
 	if err != nil {
 		return &Error{
 			err: err,

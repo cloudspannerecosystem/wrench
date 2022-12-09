@@ -19,7 +19,8 @@ var instanceCreateCmd = &cobra.Command{
 }
 
 func instanceCreate(c *cobra.Command, _ []string) error {
-	ctx := c.Context()
+	ctx, cancel := context.WithTimeout(c.Context(), timeout)
+	defer cancel()
 
 	client, err := newSpannerAdminClient(ctx, c)
 	if err != nil {
@@ -46,7 +47,8 @@ var instanceDeleteCmd = &cobra.Command{
 }
 
 func instanceDelete(c *cobra.Command, _ []string) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(c.Context(), timeout)
+	defer cancel()
 
 	client, err := newSpannerAdminClient(ctx, c)
 	if err != nil {

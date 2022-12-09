@@ -20,6 +20,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +32,8 @@ var dropCmd = &cobra.Command{
 }
 
 func drop(c *cobra.Command, _ []string) error {
-	ctx := c.Context()
+	ctx, cancel := context.WithTimeout(c.Context(), timeout)
+	defer cancel()
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
