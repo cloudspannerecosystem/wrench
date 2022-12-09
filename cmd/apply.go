@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"context"
 
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
@@ -42,7 +43,8 @@ var applyCmd = &cobra.Command{
 }
 
 func apply(c *cobra.Command, _ []string) error {
-	ctx := c.Context()
+	ctx, cancel := context.WithTimeout(c.Context(), timeout)
+	defer cancel()
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {

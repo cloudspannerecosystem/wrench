@@ -20,6 +20,7 @@
 package cmd
 
 import (
+	"context"
 	"io/ioutil"
 
 	"github.com/spf13/cobra"
@@ -32,7 +33,8 @@ var createCmd = &cobra.Command{
 }
 
 func create(c *cobra.Command, _ []string) error {
-	ctx := c.Context()
+	ctx, cancel := context.WithTimeout(c.Context(), timeout)
+	defer cancel()
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
