@@ -5,7 +5,7 @@ version: 2
 jobs:
   build_and_test:
     docker:
-      - image: golang:1.16.2-buster
+      - image: golang:1.18-bullseye
 
     working_directory: /go/src/github.com/cloudspannerecosystem/wrench
 
