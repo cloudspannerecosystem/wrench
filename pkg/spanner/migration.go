@@ -115,7 +115,7 @@ func LoadMigrations(dir string) (Migrations, error) {
 		if err != nil {
 			nstatements, nerr := dmlToStatements(f.Name(), file)
 			if nerr != nil {
-				return nil, errors.New("failed to parse DDL/DML statements")
+				return nil, fmt.Errorf("failed to parse DDL/DML statements: %v, %v", err, nerr)
 			}
 			statements = nstatements
 		}
