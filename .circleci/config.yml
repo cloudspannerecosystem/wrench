@@ -17,7 +17,12 @@ jobs:
           command: |
             echo $GCLOUD_SERVICE_KEY > $HOME/gcloud-service-key.json
             echo 'export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcloud-service-key.json' >> $BASH_ENV
-      - run: go test -v ./...
+      - run:
+          name: build
+          command: make build
+      - run:
+          name: test
+          command: make test
 
 workflows:
   version: 2
