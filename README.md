@@ -1,5 +1,4 @@
 # wrench
-[![cloudspannerecosystem](https://circleci.com/gh/cloudspannerecosystem/wrench.svg?style=svg)](https://circleci.com/gh/cloudspannerecosystem/wrench)
 
 `wrench` is a schema management tool for [Cloud Spanner](https://cloud.google.com/spanner/).
 
