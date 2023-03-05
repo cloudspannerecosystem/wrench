@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       emulator:
-        image: gcr.io/cloud-spanner-emulator/emulator:1.4.9
+        image: gcr.io/cloud-spanner-emulator/emulator:1.5.0
         ports:
           - 9010:9010
           - 9020:9020
