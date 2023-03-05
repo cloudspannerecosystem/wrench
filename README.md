@@ -1,5 +1,4 @@
 # wrench
-[![cloudspannerecosystem](https://circleci.com/gh/cloudspannerecosystem/wrench.svg?style=svg)](https://circleci.com/gh/cloudspannerecosystem/wrench)
 
 `wrench` is a schema management tool for [Cloud Spanner](https://cloud.google.com/spanner/).
 
@@ -124,6 +123,26 @@ Use `wrench [command] --help` for more information about a command.
 
 Please read the [contribution guidelines](CONTRIBUTING.md) before submitting
 pull requests.
+
+### How to run tests locally
+
+1. Start spanner emulator.
+
+```
+$ docker run --rm -it -p 9010:9010 -p 9020:9020 gcr.io/cloud-spanner-emulator/emulator:1.5.0
+```
+
+2. Initialize a spanner instance.
+
+```
+$ make setup-emulator
+```
+
+3. Run tests
+
+```
+$ make test
+```
 
 ## License
 

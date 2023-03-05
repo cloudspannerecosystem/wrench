@@ -56,9 +56,10 @@ type (
 )
 
 const (
-	envSpannerProjectID  = "SPANNER_PROJECT_ID"
-	envSpannerInstanceID = "SPANNER_INSTANCE_ID"
-	envSpannerDatabaseID = "SPANNER_DATABASE_ID"
+	envSpannerProjectID    = "SPANNER_PROJECT_ID"
+	envSpannerInstanceID   = "SPANNER_INSTANCE_ID"
+	envSpannerDatabaseID   = "SPANNER_DATABASE_ID"
+	envSpannerEmulatorHost = "SPANNER_EMULATOR_HOST"
 )
 
 func TestLoadDDL(t *testing.T) {
@@ -431,11 +432,14 @@ func TestPriorityPBOf(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func()) {
 	t.Helper()
+
+	if v := os.Getenv(envSpannerEmulatorHost); v == "" {
+		t.Fatal("test must use spanner emulator")
+	}
 
 	project := os.Getenv(envSpannerProjectID)
 	if project == "" {
@@ -447,12 +451,9 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 		t.Fatalf("must set %s", envSpannerInstanceID)
 	}
 
-	// TODO: take random database name and run tests parallelly.
-	database := os.Getenv(envSpannerDatabaseID)
-	if database == "" {
-		id := uuid.New()
-		database = fmt.Sprintf("wrench-test-%s", id.String()[:8])
-	}
+	id := uuid.New()
+	database := fmt.Sprintf("test-%s", id.String()[:18])
+	fmt.Printf("database %v\n", database)
 
 	config := &Config{
 		Project:  project,
