@@ -22,13 +22,14 @@ package cmd
 import (
 	"context"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	Version         = "unknown"
+	version         = ""
 	versionTemplate = `{{.Version}}
 `
 )
@@ -74,7 +75,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&credentialsFile, flagCredentialsFile, "", "Specify Credentials File")
 	rootCmd.PersistentFlags().DurationVar(&timeout, flagTimeout, time.Hour, "Context timeout")
 
-	rootCmd.Version = Version
+	rootCmd.Version = versionInfo()
 	rootCmd.SetVersionTemplate(versionTemplate)
 }
 
@@ -92,4 +93,17 @@ func spannerInstanceID() string {
 
 func spannerDatabaseID() string {
 	return os.Getenv("SPANNER_DATABASE_ID")
+}
+
+func versionInfo() string {
+	if version != "" {
+		return version
+	}
+
+	// For those who "go install" yo
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	return info.Main.Version
 }
