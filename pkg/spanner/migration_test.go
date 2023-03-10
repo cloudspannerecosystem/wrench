@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestLoadMigrations(t *testing.T) {
@@ -37,19 +38,22 @@ func TestLoadMigrations(t *testing.T) {
 	}
 
 	testcases := []struct {
-		idx         int
-		wantVersion uint
-		wantName    string
+		idx            int
+		wantVersion    uint
+		wantName       string
+		wantStatements []string
 	}{
 		{
-			idx:         0,
-			wantVersion: 2,
-			wantName:    "test",
+			idx:            0,
+			wantVersion:    2,
+			wantName:       "test",
+			wantStatements: []string{"ALTER TABLE Singers ADD COLUMN LastName STRING(MAX)"},
 		},
 		{
-			idx:         1,
-			wantVersion: 3,
-			wantName:    "",
+			idx:            1,
+			wantVersion:    3,
+			wantName:       "",
+			wantStatements: []string{"UPDATE Singers SET LastName = \"\" WHERE LastName IS NULL"},
 		},
 	}
 
@@ -60,6 +64,10 @@ func TestLoadMigrations(t *testing.T) {
 
 		if ms[tc.idx].Name != tc.wantName {
 			t.Errorf("migrations[%d].name want %v, but got %v", tc.idx, tc.wantName, ms[tc.idx].Name)
+		}
+
+		if !cmp.Equal(ms[tc.idx].Statements, tc.wantStatements) {
+			t.Errorf("migrations[%d].statements differ: %v", tc.idx, cmp.Diff(ms[tc.idx].Statements, tc.wantStatements))
 		}
 	}
 }
