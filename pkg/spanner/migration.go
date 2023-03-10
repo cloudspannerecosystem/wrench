@@ -132,6 +132,16 @@ func LoadMigrations(dir string) (Migrations, error) {
 	return migrations, nil
 }
 
+// ddlToStatements wraps ToStatements(data) to minimize changes
+func ddlToStatements(filename string, data []byte) ([]string, error) {
+	return ToStatements(data), nil
+}
+
+// dmlToStatements wraps ToStatements(data) to minimize changes
+func dmlToStatements(filename string, data []byte) ([]string, error) {
+	return ToStatements(data), nil
+}
+
 func ToStatements(data []byte) []string {
 	inputStatement := separateInput(string(data))
 
