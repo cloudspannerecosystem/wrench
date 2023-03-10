@@ -26,8 +26,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-
-	"cloud.google.com/go/spanner/spansql"
 )
 
 var (
@@ -111,14 +109,7 @@ func LoadMigrations(dir string) (Migrations, error) {
 			continue
 		}
 
-		statements, err := ddlToStatements(f.Name(), file)
-		if err != nil {
-			nstatements, nerr := dmlToStatements(f.Name(), file)
-			if nerr != nil {
-				return nil, fmt.Errorf("failed to parse DDL/DML statements: %v, %v", err, nerr)
-			}
-			statements = nstatements
-		}
+		statements := ToStatements(file)
 
 		kind, err := inspectStatementsKind(statements)
 		if err != nil {
@@ -141,32 +132,15 @@ func LoadMigrations(dir string) (Migrations, error) {
 	return migrations, nil
 }
 
-func ddlToStatements(filename string, data []byte) ([]string, error) {
-	ddl, err := spansql.ParseDDL(filename, string(data))
-	if err != nil {
-		return nil, err
-	}
+func ToStatements(data []byte) []string {
+	inputStatement := separateInput(string(data))
 
 	var statements []string
-	for _, stmt := range ddl.List {
-		statements = append(statements, stmt.SQL())
+	for _, stmt := range inputStatement {
+		statements = append(statements, stmt.statement)
 	}
 
-	return statements, nil
-}
-
-func dmlToStatements(filename string, data []byte) ([]string, error) {
-	dml, err := spansql.ParseDML(filename, string(data))
-	if err != nil {
-		return nil, err
-	}
-
-	var statements []string
-	for _, stmt := range dml.List {
-		statements = append(statements, stmt.SQL())
-	}
-
-	return statements, nil
+	return statements
 }
 
 func inspectStatementsKind(statements []string) (statementKind, error) {
