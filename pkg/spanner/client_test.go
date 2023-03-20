@@ -27,9 +27,9 @@ import (
 	"testing"
 
 	"cloud.google.com/go/spanner"
+	sppb "cloud.google.com/go/spanner/apiv1/spannerpb"
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
-	sppb "google.golang.org/genproto/googleapis/spanner/v1"
 )
 
 const (
@@ -56,12 +56,14 @@ type (
 )
 
 const (
-	envSpannerProjectID  = "SPANNER_PROJECT_ID"
-	envSpannerInstanceID = "SPANNER_INSTANCE_ID"
-	envSpannerDatabaseID = "SPANNER_DATABASE_ID"
+	envSpannerProjectID    = "SPANNER_PROJECT_ID"
+	envSpannerInstanceID   = "SPANNER_INSTANCE_ID"
+	envSpannerDatabaseID   = "SPANNER_DATABASE_ID"
+	envSpannerEmulatorHost = "SPANNER_EMULATOR_HOST"
 )
 
 func TestLoadDDL(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	client, done := testClientWithDatabase(t, ctx)
@@ -83,6 +85,7 @@ func TestLoadDDL(t *testing.T) {
 }
 
 func TestApplyDDLFile(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	ddl, err := ioutil.ReadFile("testdata/ddl.sql")
@@ -126,6 +129,7 @@ func TestApplyDDLFile(t *testing.T) {
 }
 
 func TestApplyDMLFile(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	client, done := testClientWithDatabase(t, ctx)
@@ -199,6 +203,7 @@ func TestApplyDMLFile(t *testing.T) {
 }
 
 func TestExecuteMigrations(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	client, done := testClientWithDatabase(t, ctx)
@@ -296,6 +301,7 @@ func ensureMigrationVersionRecord(t *testing.T, ctx context.Context, client *Cli
 }
 
 func TestGetSchemaMigrationVersion(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	client, done := testClientWithDatabase(t, ctx)
@@ -329,6 +335,7 @@ func TestGetSchemaMigrationVersion(t *testing.T) {
 }
 
 func TestSetSchemaMigrationVersion(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	client, done := testClientWithDatabase(t, ctx)
@@ -358,6 +365,7 @@ func TestSetSchemaMigrationVersion(t *testing.T) {
 }
 
 func TestEnsureMigrationTable(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	client, done := testClientWithDatabase(t, ctx)
@@ -402,6 +410,7 @@ func TestEnsureMigrationTable(t *testing.T) {
 }
 
 func TestPriorityPBOf(t *testing.T) {
+	t.Parallel()
 	tests := map[string]struct {
 		priority PriorityType
 		want     sppb.RequestOptions_Priority
@@ -431,11 +440,14 @@ func TestPriorityPBOf(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func()) {
 	t.Helper()
+
+	if v := os.Getenv(envSpannerEmulatorHost); v == "" {
+		t.Fatal("test must use spanner emulator")
+	}
 
 	project := os.Getenv(envSpannerProjectID)
 	if project == "" {
@@ -447,12 +459,9 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 		t.Fatalf("must set %s", envSpannerInstanceID)
 	}
 
-	// TODO: take random database name and run tests parallelly.
-	database := os.Getenv(envSpannerDatabaseID)
-	if database == "" {
-		id := uuid.New()
-		database = fmt.Sprintf("wrench-test-%s", id.String()[:8])
-	}
+	id := uuid.New()
+	database := fmt.Sprintf("test-%s", id.String()[:18])
+	t.Logf("database %v\n", database)
 
 	config := &Config{
 		Project:  project,
@@ -472,6 +481,14 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 
 	if err := client.CreateDatabase(ctx, "testdata/schema.sql", ddl); err != nil {
 		t.Fatalf("failed to create database: %v", err)
+	}
+
+	// Spanner emulator is unstable when using a connection before creating a database.
+	// So recreate a wrench client for reconnecting the emulator.
+	client.Close()
+	client, err = NewClient(ctx, config)
+	if err != nil {
+		t.Fatalf("failed to create spanner client: %v", err)
 	}
 
 	return client, func() {
