@@ -22,7 +22,7 @@ package spanner
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -39,12 +39,18 @@ var (
 
 	MigrationNameRegex = regexp.MustCompile(`[a-zA-Z0-9_\-]+`)
 
-	dmlRegex = regexp.MustCompile("^(UPDATE|DELETE)[\t\n\f\r ].*")
+	dmlRegex = regexp.MustCompile("^(INSERT|UPDATE|DELETE)[\t\n\f\r ].*")
+
+	// Instead of a regex to determine if a DML statement is a PartitionedDML we check if it's
+	// not a PartitionedDML by checking for INSERT statements.
+	// An improvement would be to use spanners algo to distinguish between DML types.
+	notPartitionedDmlRegex = regexp.MustCompile(`(?i)^INSERT`)
 )
 
 const (
-	statementKindDDL statementKind = "DDL"
-	statementKindDML statementKind = "DML"
+	statementKindDDL            statementKind = "DDL"
+	statementKindDML            statementKind = "DML"
+	statementKindPartitionedDML statementKind = "PartitionedDML"
 )
 
 type (
@@ -80,7 +86,7 @@ func (ms Migrations) Less(i, j int) bool {
 }
 
 func LoadMigrations(dir string) (Migrations, error) {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +112,7 @@ func LoadMigrations(dir string) (Migrations, error) {
 
 		fileName := f.Name()
 
-		file, err := ioutil.ReadFile(filepath.Join(dir, fileName))
+		file, err := os.ReadFile(filepath.Join(dir, fileName))
 		if err != nil {
 			continue
 		}
@@ -171,29 +177,61 @@ func dmlToStatements(filename string, data []byte) ([]string, error) {
 
 func inspectStatementsKind(statements []string) (statementKind, error) {
 	kindMap := map[statementKind]uint64{
-		statementKindDDL: 0,
-		statementKindDML: 0,
+		statementKindDDL:            0,
+		statementKindDML:            0,
+		statementKindPartitionedDML: 0,
 	}
 
 	for _, s := range statements {
-		if isDML(s) {
-			kindMap[statementKindDML]++
-		} else {
-			kindMap[statementKindDDL]++
-		}
+		kindMap[getStatementKind(s)]++
 	}
 
-	if kindMap[statementKindDML] > 0 {
-		if kindMap[statementKindDDL] > 0 {
-			return "", errors.New("cannot specify DDL and DML at same migration file")
-		}
+	if distinctKind(kindMap, statementKindDDL) {
+		return statementKindDDL, nil
+	}
 
+	if distinctKind(kindMap, statementKindDML) {
 		return statementKindDML, nil
 	}
 
-	return statementKindDDL, nil
+	if distinctKind(kindMap, statementKindPartitionedDML) {
+		return statementKindPartitionedDML, nil
+	}
+
+	return "", errors.New("cannot specify DDL and DML in the same migration file")
 }
 
 func isDML(statement string) bool {
+	return dmlRegex.Match([]byte(statement))
+}
+
+func distinctKind(kindMap map[statementKind]uint64, kind statementKind) bool {
+	target := kindMap[kind]
+
+	var total uint64
+	for k := range kindMap {
+		total = total + kindMap[k]
+	}
+
+	return target == total
+}
+
+func getStatementKind(statement string) statementKind {
+	if isPartitionedDMLOnly(statement) {
+		return statementKindPartitionedDML
+	}
+
+	if isDMLAny(statement) {
+		return statementKindDML
+	}
+
+	return statementKindDDL
+}
+
+func isPartitionedDMLOnly(statement string) bool {
+	return isDMLAny(statement) && !notPartitionedDmlRegex.Match([]byte(statement))
+}
+
+func isDMLAny(statement string) bool {
 	return dmlRegex.Match([]byte(statement))
 }
