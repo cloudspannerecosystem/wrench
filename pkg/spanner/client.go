@@ -27,7 +27,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 	databasev1 "cloud.google.com/go/spanner/admin/database/apiv1"
-	databasepb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	sppb "cloud.google.com/go/spanner/apiv1/spannerpb"
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/api/iterator"
@@ -356,6 +356,13 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 				}
 			}
 		case statementKindDML:
+			if _, err := c.ApplyDML(ctx, m.Statements, PriorityTypeHigh); err != nil {
+				return &Error{
+					Code: ErrorCodeExecuteMigrations,
+					err:  err,
+				}
+			}
+		case statementKindPartitionedDML:
 			if _, err := c.ApplyPartitionedDML(ctx, m.Statements, PriorityTypeUnspecified); err != nil {
 				return &Error{
 					Code: ErrorCodeExecuteMigrations,
