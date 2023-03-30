@@ -26,15 +26,20 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
 
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
-	"github.com/spf13/cobra"
 )
 
 const (
 	migrationsDirName  = "migrations"
 	migrationTableName = "SchemaMigrations"
+)
+
+const (
+	createMigrationFileLayout = "20060102150405"
 )
 
 // migrateCmd represents the migrate command
@@ -225,37 +230,25 @@ func migrateSet(c *cobra.Command, args []string) error {
 
 func createMigrationFile(dir string, name string, digits int) (string, error) {
 	if name != "" && !spanner.MigrationNameRegex.MatchString(name) {
-		return "", errors.New("Invalid migration file name.")
+		return "", errors.New("invalid migration file name")
 	}
 
-	ms, err := spanner.LoadMigrations(dir)
-	if err != nil {
-		return "", err
-	}
-
-	var v uint = 1
-	if len(ms) > 0 {
-		v = ms[len(ms)-1].Version + 1
-	}
-	vStr := fmt.Sprint(v)
-
-	padding := digits - len(vStr)
-	if padding > 0 {
-		vStr = strings.Repeat("0", padding) + vStr
-	}
-
+	fileTimestampStr := time.Now().Format(createMigrationFileLayout)
 	var filename string
-	if name == "" {
-		filename = filepath.Join(dir, fmt.Sprintf("%s.sql", vStr))
-	} else {
-		filename = filepath.Join(dir, fmt.Sprintf("%s_%s.sql", vStr, name))
+	filename = filepath.Join(dir, fmt.Sprintf("%s.sql", fileTimestampStr))
+	if name != "" {
+		filename = filepath.Join(dir, fmt.Sprintf("%s_%s.sql", fileTimestampStr, name))
 	}
 
 	fp, err := os.Create(filename)
+	defer func() {
+		if defErr := fp.Close(); defErr != nil {
+			err = defErr
+		}
+	}()
 	if err != nil {
 		return "", err
 	}
-	fp.Close()
 
 	return filename, nil
 }
