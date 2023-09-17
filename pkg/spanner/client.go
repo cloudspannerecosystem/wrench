@@ -48,7 +48,13 @@ type Client struct {
 	spannerAdminClient *databasev1.DatabaseAdminClient
 }
 
-func NewClient(ctx context.Context, config *Config, opts ...option.ClientOption) (*Client, error) {
+func NewClient(ctx context.Context, config *Config) (*Client, error) {
+	var opts []option.ClientOption
+
+	// The options passed by config are evaluated first.
+	// Most options are last win so the options can be overridden by another option.
+	opts = append(opts, config.ClientOptions...)
+
 	if config.CredentialsFile != "" {
 		opts = append(opts, option.WithCredentialsFile(config.CredentialsFile))
 	}

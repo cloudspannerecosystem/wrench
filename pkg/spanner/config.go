@@ -19,13 +19,24 @@
 
 package spanner
 
-import "fmt"
+import (
+	"fmt"
+
+	"google.golang.org/api/option"
+)
 
 type Config struct {
 	Project         string
 	Instance        string
 	Database        string
 	CredentialsFile string
+
+	// ClientOptions is options of Spanner clients when creating the clients for both normal
+	// and admin. This options are evaluated first and can be overridden by other
+	// configurations in Wrench.
+	//
+	// Experimental: There will be a breaking change in the future versions.
+	ClientOptions []option.ClientOption
 }
 
 func (c *Config) URL() string {
