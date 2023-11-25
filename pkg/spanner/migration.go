@@ -22,7 +22,7 @@ package spanner
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -80,7 +80,7 @@ func (ms Migrations) Less(i, j int) bool {
 }
 
 func LoadMigrations(dir string) (Migrations, error) {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func LoadMigrations(dir string) (Migrations, error) {
 
 		fileName := f.Name()
 
-		file, err := ioutil.ReadFile(filepath.Join(dir, fileName))
+		file, err := os.ReadFile(filepath.Join(dir, fileName))
 		if err != nil {
 			continue
 		}
