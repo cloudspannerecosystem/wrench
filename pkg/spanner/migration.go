@@ -94,7 +94,9 @@ func LoadMigrations(dir string) (Migrations, error) {
 			continue
 		}
 
-		matches := migrationFileRegex.FindStringSubmatch(f.Name())
+		filename := f.Name()
+
+		matches := migrationFileRegex.FindStringSubmatch(filename)
 		if len(matches) != 4 {
 			continue
 		}
@@ -104,9 +106,7 @@ func LoadMigrations(dir string) (Migrations, error) {
 			continue
 		}
 
-		fileName := f.Name()
-
-		file, err := os.ReadFile(filepath.Join(dir, fileName))
+		file, err := os.ReadFile(filepath.Join(dir, filename))
 		if err != nil {
 			continue
 		}
@@ -133,9 +133,9 @@ func LoadMigrations(dir string) (Migrations, error) {
 		})
 
 		if prevFileName, ok := versions[version]; ok {
-			return nil, fmt.Errorf("colliding version number \"%d\" between file names \"%s\" and \"%s\"", version, prevFileName, fileName)
+			return nil, fmt.Errorf("colliding version number \"%d\" between file names \"%s\" and \"%s\"", version, prevFileName, filename)
 		}
-		versions[version] = fileName
+		versions[version] = filename
 	}
 
 	return migrations, nil
