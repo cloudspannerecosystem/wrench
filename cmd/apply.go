@@ -23,9 +23,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 var (
