@@ -22,7 +22,6 @@ package spanner
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -74,7 +73,7 @@ func TestLoadDDL(t *testing.T) {
 		t.Fatalf("failed to load ddl: %v", err)
 	}
 
-	wantDDL, err := ioutil.ReadFile("testdata/schema.sql")
+	wantDDL, err := os.ReadFile("testdata/schema.sql")
 	if err != nil {
 		t.Fatalf("failed to read ddl file: %v", err)
 	}
@@ -88,7 +87,7 @@ func TestApplyDDLFile(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	ddl, err := ioutil.ReadFile("testdata/ddl.sql")
+	ddl, err := os.ReadFile("testdata/ddl.sql")
 	if err != nil {
 		t.Fatalf("failed to read ddl file: %v", err)
 	}
@@ -171,7 +170,7 @@ func TestApplyDMLFile(t *testing.T) {
 				t.Fatalf("failed to apply mutation: %v", err)
 			}
 
-			dml, err := ioutil.ReadFile("testdata/dml.sql")
+			dml, err := os.ReadFile("testdata/dml.sql")
 			if err != nil {
 				t.Fatalf("failed to read dml file: %v", err)
 			}
@@ -474,7 +473,7 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 		t.Fatalf("failed to create spanner client: %v", err)
 	}
 
-	ddl, err := ioutil.ReadFile("testdata/schema.sql")
+	ddl, err := os.ReadFile("testdata/schema.sql")
 	if err != nil {
 		t.Fatalf("failed to read schema file: %v", err)
 	}

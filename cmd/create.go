@@ -21,7 +21,7 @@ package cmd
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -43,7 +43,7 @@ func create(c *cobra.Command, _ []string) error {
 	defer client.Close()
 
 	filename := schemaFilePath(c)
-	ddl, err := ioutil.ReadFile(filename)
+	ddl, err := os.ReadFile(filename)
 	if err != nil {
 		return &Error{
 			err: err,

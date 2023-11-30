@@ -21,7 +21,7 @@ package cmd
 
 import (
 	"context"
-	"io/ioutil"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -50,7 +50,7 @@ func load(c *cobra.Command, _ []string) error {
 		}
 	}
 
-	err = ioutil.WriteFile(schemaFilePath(c), ddl, 0o664)
+	err = os.WriteFile(schemaFilePath(c), ddl, 0o664)
 	if err != nil {
 		return &Error{
 			err: err,
