@@ -39,7 +39,7 @@ var (
 
 	MigrationNameRegex = regexp.MustCompile(`[a-zA-Z0-9_\-]+`)
 
-	dmlRegex = regexp.MustCompile("^(UPDATE|DELETE)[\t\n\f\r ].*")
+	dmlRegex = regexp.MustCompile("^(INSERT|UPDATE|DELETE)[\t\n\f\r ].*")
 )
 
 const (
