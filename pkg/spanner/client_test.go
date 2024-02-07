@@ -59,6 +59,7 @@ const (
 	envSpannerInstanceID   = "SPANNER_INSTANCE_ID"
 	envSpannerDatabaseID   = "SPANNER_DATABASE_ID"
 	envSpannerEmulatorHost = "SPANNER_EMULATOR_HOST"
+	skipChangeStream       = false
 )
 
 func TestLoadDDL(t *testing.T) {
@@ -68,7 +69,8 @@ func TestLoadDDL(t *testing.T) {
 	client, done := testClientWithDatabase(t, ctx)
 	defer done()
 
-	gotDDL, err := client.LoadDDL(ctx)
+	// we can't include Change Stream schema to testdata because cloud-spanner-emulator hasn't supported it yet.
+	gotDDL, err := client.LoadDDL(ctx, skipChangeStream)
 	if err != nil {
 		t.Fatalf("failed to load ddl: %v", err)
 	}

@@ -26,6 +26,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	skipChangeStream bool
+)
 var loadCmd = &cobra.Command{
 	Use:   "load",
 	Short: "Load schema from server to file",
@@ -42,7 +45,7 @@ func load(c *cobra.Command, _ []string) error {
 	}
 	defer client.Close()
 
-	ddl, err := client.LoadDDL(ctx)
+	ddl, err := client.LoadDDL(ctx, skipChangeStream)
 	if err != nil {
 		return &Error{
 			err: err,
@@ -59,4 +62,8 @@ func load(c *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+func init() {
+	loadCmd.PersistentFlags().BoolVar(&skipChangeStream, flagSkipChangeStream, false, "Skip Change Stream to load")
 }

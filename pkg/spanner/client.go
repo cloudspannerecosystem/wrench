@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"cloud.google.com/go/spanner"
 	databasev1 "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -174,7 +175,7 @@ func (c *Client) TruncateAllTables(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) LoadDDL(ctx context.Context) ([]byte, error) {
+func (c *Client) LoadDDL(ctx context.Context, skipChangeStream bool) ([]byte, error) {
 	req := &databasepb.GetDatabaseDdlRequest{Database: c.config.URL()}
 
 	res, err := c.spannerAdminClient.GetDatabaseDdl(ctx, req)
@@ -188,6 +189,9 @@ func (c *Client) LoadDDL(ctx context.Context) ([]byte, error) {
 	var schema []byte
 	last := len(res.Statements) - 1
 	for index, statement := range res.Statements {
+		if skipChangeStream && strings.HasPrefix(statement, "CREATE CHANGE STREAM") {
+			continue
+		}
 		if index != last {
 			statement += ddlStatementsSeparator + "\n\n"
 		} else {

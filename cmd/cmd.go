@@ -41,6 +41,7 @@ const (
 	flagPriority          = "priority"
 	flagNode              = "node"
 	flagTimeout           = "timeout"
+	flagSkipChangeStream  = "skip_change_stream"
 	defaultSchemaFileName = "schema.sql"
 )
 
