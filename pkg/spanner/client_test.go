@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/spanner"
@@ -59,30 +60,45 @@ const (
 	envSpannerInstanceID   = "SPANNER_INSTANCE_ID"
 	envSpannerDatabaseID   = "SPANNER_DATABASE_ID"
 	envSpannerEmulatorHost = "SPANNER_EMULATOR_HOST"
-	skipChangeStream       = false
 )
 
 func TestLoadDDL(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	t.Run("all", func(t *testing.T) {
+		ctx := context.Background()
 
-	client, done := testClientWithDatabase(t, ctx)
-	defer done()
+		client, done := testClientWithDatabase(t, ctx)
+		defer done()
 
-	// we can't include Change Stream schema to testdata because cloud-spanner-emulator hasn't supported it yet.
-	gotDDL, err := client.LoadDDL(ctx, skipChangeStream)
-	if err != nil {
-		t.Fatalf("failed to load ddl: %v", err)
-	}
+		gotDDL, err := client.LoadDDL(ctx, false)
+		if err != nil {
+			t.Fatalf("failed to load ddl: %v", err)
+		}
 
-	wantDDL, err := os.ReadFile("testdata/schema.sql")
-	if err != nil {
-		t.Fatalf("failed to read ddl file: %v", err)
-	}
+		wantDDL, err := os.ReadFile("testdata/schema.sql")
+		if err != nil {
+			t.Fatalf("failed to read ddl file: %v", err)
+		}
 
-	if want, got := string(wantDDL), string(gotDDL); want != got {
-		t.Errorf("want: \n%s\n but got: \n%s", want, got)
-	}
+		if want, got := string(wantDDL), string(gotDDL); want != got {
+			t.Errorf("want: \n%s\n but got: \n%s", want, got)
+		}
+	})
+	t.Run("skip change stream", func(t *testing.T) {
+		ctx := context.Background()
+
+		client, done := testClientWithDatabase(t, ctx)
+		defer done()
+
+		gotDDL, err := client.LoadDDL(ctx, true)
+		if err != nil {
+			t.Fatalf("failed to load ddl: %v", err)
+		}
+
+		if got := string(gotDDL); strings.Contains(got, "CREATE CHANGE STREAM") {
+			t.Errorf("got DDL includes Change Stream DDL. got: \n%s", got)
+		}
+	})
 }
 
 func TestApplyDDLFile(t *testing.T) {
