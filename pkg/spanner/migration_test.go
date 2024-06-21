@@ -32,7 +32,7 @@ func TestLoadMigrations(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(ms) != 3 {
+	if len(ms) != 4 {
 		t.Fatalf("migrations length want 3, but got %v", len(ms))
 	}
 

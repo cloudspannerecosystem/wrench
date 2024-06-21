@@ -237,13 +237,13 @@ func TestExecuteMigrations(t *testing.T) {
 		t.Fatalf("failed to execute migration: %v", err)
 	}
 
-	// ensure that 000003.sql and 000004.sql have been applied.
+	// ensure that 000003.sql, 000004.sql and 000005.sql have been applied.
 	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "NO")
-	ensureMigrationVersionRecord(t, ctx, client, 4, false)
+	ensureMigrationVersionRecord(t, ctx, client, 5, false)
 
 	// ensure that schema is not changed and ExecuteMigrate is safely finished even though no migrations should be applied.
 	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "NO")
-	ensureMigrationVersionRecord(t, ctx, client, 4, false)
+	ensureMigrationVersionRecord(t, ctx, client, 5, false)
 }
 
 func ensureMigrationColumn(t *testing.T, ctx context.Context, client *Client, columnName, spannerType, isNullable string) {

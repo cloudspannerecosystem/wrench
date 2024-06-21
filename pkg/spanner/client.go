@@ -361,6 +361,13 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 				}
 			}
 		case statementKindDML:
+			if _, err := c.ApplyDML(ctx, m.Statements, PriorityTypeUnspecified); err != nil {
+				return &Error{
+					Code: ErrorCodeExecuteMigrations,
+					err:  err,
+				}
+			}
+		case statementKindPartitionedDML:
 			if _, err := c.ApplyPartitionedDML(ctx, m.Statements, PriorityTypeUnspecified); err != nil {
 				return &Error{
 					Code: ErrorCodeExecuteMigrations,
