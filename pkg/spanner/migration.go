@@ -172,41 +172,32 @@ func dmlToStatements(filename string, data []byte) ([]string, error) {
 }
 
 func inspectStatementsKind(statements []string) (statementKind, error) {
-	kindMap := map[statementKind]uint64{
-		statementKindDDL:            0,
-		statementKindDML:            0,
-		statementKindPartitionedDML: 0,
-	}
-
-	for _, s := range statements {
-		if isDML(s) {
-			kindMap[statementKindDML]++
-		} else if isPartitionedDML(s) {
-			kindMap[statementKindPartitionedDML]++
-		} else {
-			kindMap[statementKindDDL]++
-		}
-	}
-
-	if kindMap[statementKindDDL] > 0 {
-		if kindMap[statementKindDML] > 0 || kindMap[statementKindPartitionedDML] > 0 {
-			return "", errors.New("cannot specify DDL with DML or partitioned DML in the same migration file")
-		}
+	if len(statements) == 0 { // Treat empty files as DDL.
 		return statementKindDDL, nil
 	}
 
-	if kindMap[statementKindDML] > 0 {
-		if kindMap[statementKindPartitionedDML] > 0 {
-			return "", errors.New("cannot specify DML and partitioned DML in the same migration file")
+	var hasDDL, hasDML, hasPartitionedDML bool
+	for _, s := range statements {
+		switch {
+		case isDML(s):
+			hasDML = true
+		case isPartitionedDML(s):
+			hasPartitionedDML = true
+		default:
+			hasDDL = true
 		}
+	}
+
+	switch {
+	case hasDDL && !hasDML && !hasPartitionedDML:
+		return statementKindDDL, nil
+	case !hasDDL && hasDML && !hasPartitionedDML:
 		return statementKindDML, nil
-	}
-
-	if kindMap[statementKindPartitionedDML] > 0 {
+	case !hasDDL && !hasDML && hasPartitionedDML:
 		return statementKindPartitionedDML, nil
+	default:
+		return "", errors.New("DDL, DML (INSERT), and partitioned DML (UPDATE or DELETE) must not be combined in the same migration file")
 	}
-
-	return statementKindDDL, nil
 }
 
 func isDML(statement string) bool {
