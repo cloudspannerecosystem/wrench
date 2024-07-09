@@ -39,12 +39,14 @@ var (
 
 	MigrationNameRegex = regexp.MustCompile(`[a-zA-Z0-9_\-]+`)
 
-	dmlRegex = regexp.MustCompile("^(INSERT|UPDATE|DELETE)[\t\n\f\r ].*")
+	dmlRegex            = regexp.MustCompile("^(INSERT)[\t\n\f\r ].*")
+	partitionedDmlRegex = regexp.MustCompile("^(UPDATE|DELETE)[\t\n\f\r ].*")
 )
 
 const (
-	statementKindDDL statementKind = "DDL"
-	statementKindDML statementKind = "DML"
+	statementKindDDL            statementKind = "DDL"
+	statementKindDML            statementKind = "DML"
+	statementKindPartitionedDML statementKind = "PartitionedDML"
 )
 
 type (
@@ -170,30 +172,38 @@ func dmlToStatements(filename string, data []byte) ([]string, error) {
 }
 
 func inspectStatementsKind(statements []string) (statementKind, error) {
-	kindMap := map[statementKind]uint64{
-		statementKindDDL: 0,
-		statementKindDML: 0,
+	if len(statements) == 0 { // Treat empty files as DDL.
+		return statementKindDDL, nil
 	}
 
+	var hasDDL, hasDML, hasPartitionedDML bool
 	for _, s := range statements {
-		if isDML(s) {
-			kindMap[statementKindDML]++
-		} else {
-			kindMap[statementKindDDL]++
+		switch {
+		case isDML(s):
+			hasDML = true
+		case isPartitionedDML(s):
+			hasPartitionedDML = true
+		default:
+			hasDDL = true
 		}
 	}
 
-	if kindMap[statementKindDML] > 0 {
-		if kindMap[statementKindDDL] > 0 {
-			return "", errors.New("cannot specify DDL and DML at same migration file")
-		}
-
+	switch {
+	case hasDDL && !hasDML && !hasPartitionedDML:
+		return statementKindDDL, nil
+	case !hasDDL && hasDML && !hasPartitionedDML:
 		return statementKindDML, nil
+	case !hasDDL && !hasDML && hasPartitionedDML:
+		return statementKindPartitionedDML, nil
+	default:
+		return "", errors.New("DDL, DML (INSERT), and partitioned DML (UPDATE or DELETE) must not be combined in the same migration file")
 	}
-
-	return statementKindDDL, nil
 }
 
 func isDML(statement string) bool {
 	return dmlRegex.Match([]byte(statement))
+}
+
+func isPartitionedDML(statement string) bool {
+	return partitionedDmlRegex.Match([]byte(statement))
 }
