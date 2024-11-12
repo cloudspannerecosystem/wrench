@@ -26,8 +26,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-
-	"cloud.google.com/go/spanner/spansql"
 )
 
 var (
@@ -144,31 +142,11 @@ func LoadMigrations(dir string) (Migrations, error) {
 }
 
 func ddlToStatements(filename string, data []byte) ([]string, error) {
-	ddl, err := spansql.ParseDDL(filename, string(data))
-	if err != nil {
-		return nil, err
-	}
-
-	var statements []string
-	for _, stmt := range ddl.List {
-		statements = append(statements, stmt.SQL())
-	}
-
-	return statements, nil
+	return toStatements(filename, data)
 }
 
 func dmlToStatements(filename string, data []byte) ([]string, error) {
-	dml, err := spansql.ParseDML(filename, string(data))
-	if err != nil {
-		return nil, err
-	}
-
-	var statements []string
-	for _, stmt := range dml.List {
-		statements = append(statements, stmt.SQL())
-	}
-
-	return statements, nil
+	return toStatements(filename, data)
 }
 
 func inspectStatementsKind(statements []string) (statementKind, error) {
@@ -200,10 +178,3 @@ func inspectStatementsKind(statements []string) (statementKind, error) {
 	}
 }
 
-func isDML(statement string) bool {
-	return dmlRegex.Match([]byte(statement))
-}
-
-func isPartitionedDML(statement string) bool {
-	return partitionedDmlRegex.Match([]byte(statement))
-}
