@@ -7,7 +7,6 @@ toolchain go1.23.2
 require (
 	cloud.google.com/go/spanner v1.64.0
 	github.com/apstndb/gsqlutils v0.0.0-20241110070457-b8882df29778
-	github.com/davecgh/go-spew v1.1.1
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/spf13/cobra v1.7.0
