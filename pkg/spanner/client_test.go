@@ -73,7 +73,7 @@ func TestLoadDDL(t *testing.T) {
 		t.Fatalf("failed to load ddl: %v", err)
 	}
 
-	wantDDL, err := os.ReadFile("testdata/schema.sql")
+	wantDDL, err := os.ReadFile("testdata/schema_loaded.sql")
 	if err != nil {
 		t.Fatalf("failed to read ddl file: %v", err)
 	}
