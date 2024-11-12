@@ -1,3 +1,4 @@
+-- Comments must be permitted
 CREATE TABLE SchemaMigrations (
   Version INT64 NOT NULL,
   Dirty BOOL NOT NULL,
