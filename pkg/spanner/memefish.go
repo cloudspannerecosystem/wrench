@@ -2,15 +2,17 @@ package spanner
 
 import (
 	"github.com/apstndb/gsqlutils"
+	"github.com/cloudspannerecosystem/memefish"
 )
 
-// Directly use of memefish is permitted only in this file.
+// Directly use of memefish/gsqlutils is permitted only in this file.
 func toStatements(filename string, data []byte) ([]string, error) {
-	rawStmts, err := gsqlutils.SeparateInputPreserveCommentsWithStatus(filename, string(data))
+	rawStmts, err := memefish.SplitRawStatements(filename, string(data))
 	if err != nil {
 		return nil, err
 	}
 
+	// need to strip comments because memefish.SplitRawStatements preserve comments, but UpdateDDL doesn't support comments.
 	var result []string
 	for _, rawStmt := range rawStmts {
 		stripped, err := gsqlutils.SimpleStripComments("", rawStmt.Statement)
@@ -31,6 +33,7 @@ func isDML(statement string) bool {
 }
 
 func isPartitionedDML(statement string) bool {
+	// It is better than regular expression because PDML can be prefixed by statement hints.
 	token, err := gsqlutils.FirstNonHintToken("", statement)
 	if err != nil {
 		return false

@@ -36,9 +36,6 @@ var (
 	migrationFileRegex = regexp.MustCompile(`^([0-9]+)(?:_([a-zA-Z0-9_\-]+))?(\.up)?\.sql$`)
 
 	MigrationNameRegex = regexp.MustCompile(`[a-zA-Z0-9_\-]+`)
-
-	dmlRegex            = regexp.MustCompile("^(INSERT)[\t\n\f\r ].*")
-	partitionedDmlRegex = regexp.MustCompile("^(UPDATE|DELETE)[\t\n\f\r ].*")
 )
 
 const (
