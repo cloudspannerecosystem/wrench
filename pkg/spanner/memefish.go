@@ -19,7 +19,9 @@ func toStatements(filename string, data []byte) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, stripped)
+		if len(stripped) != 0 {
+			result = append(result, stripped)
+		}
 	}
 	return result, nil
 }
