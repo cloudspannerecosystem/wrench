@@ -59,7 +59,19 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 		opts = append(opts, option.WithCredentialsFile(config.CredentialsFile))
 	}
 
-	spannerClient, err := spanner.NewClient(ctx, config.URL(), opts...)
+	spannerClient, err := spanner.NewClientWithConfig(ctx, config.URL(),
+		spanner.ClientConfig{
+			SessionPoolConfig: spanner.SessionPoolConfig{
+				MaxOpened:                         spanner.DefaultSessionPoolConfig.MaxOpened,
+				MinOpened:                         1,
+				MaxIdle:                           spanner.DefaultSessionPoolConfig.MaxIdle,
+				HealthCheckWorkers:                spanner.DefaultSessionPoolConfig.HealthCheckWorkers,
+				HealthCheckInterval:               spanner.DefaultSessionPoolConfig.HealthCheckInterval,
+				TrackSessionHandles:               false,
+				InactiveTransactionRemovalOptions: spanner.DefaultSessionPoolConfig.InactiveTransactionRemovalOptions,
+			},
+		},
+		opts...)
 	if err != nil {
 		return nil, &Error{
 			Code: ErrorCodeCreateClient,
