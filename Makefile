@@ -6,7 +6,7 @@ SPANNER_EMULATOR_HOST_REST := localhost:9020
 export SPANNER_PROJECT_ID ?= wrench-test-project
 export SPANNER_INSTANCE_ID ?= wrench-test-instance
 
-REGISTRY := mercari/wrench
+REGISTRY := ghcr.io/cloudspannerecosystem/wrench
 
 .PHONY: test
 test:
