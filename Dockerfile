@@ -1,4 +1,4 @@
-FROM golang:1.23 as build
+FROM golang:1.24 as build
 
 ARG VERSION
 
@@ -10,6 +10,6 @@ RUN CGO_ENABLED=0 go build \
     -ldflags "-s -w -X github.com/cloudspannerecosystem/wrench/cmd.version=${VERSION}" \
     -o /go/bin/app/wrench
 
-FROM gcr.io/distroless/static-debian11
+FROM gcr.io/distroless/static-debian12
 COPY --from=build /go/bin/app/wrench /
 ENTRYPOINT ["/wrench"]
