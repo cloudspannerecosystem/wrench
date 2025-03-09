@@ -20,6 +20,7 @@
 package spanner_test
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -27,7 +28,9 @@ import (
 )
 
 func TestLoadMigrations(t *testing.T) {
-	ms, err := spanner.LoadMigrations(filepath.Join("testdata", "migrations"))
+	ctx := context.Background()
+
+	ms, err := spanner.ReadMigrations(ctx, filepath.Join("testdata", "migrations"))
 	if err != nil {
 		t.Fatal(err)
 	}
