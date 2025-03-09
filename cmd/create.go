@@ -21,8 +21,7 @@ package cmd
 
 import (
 	"context"
-	"os"
-
+	"github.com/cloudspannerecosystem/wrench/internal/fs"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +42,7 @@ func create(c *cobra.Command, _ []string) error {
 	defer client.Close()
 
 	filename := schemaFilePath(c)
-	ddl, err := os.ReadFile(filename)
+	ddl, err := fs.ReadFile(ctx, filename)
 	if err != nil {
 		return &Error{
 			err: err,
