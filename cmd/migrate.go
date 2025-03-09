@@ -93,7 +93,7 @@ func migrateCreate(c *cobra.Command, args []string) error {
 		}
 	}
 
-	filename, err := createMigrationFile(dir, name, 6)
+	filename, err := createMigrationFile(c.Context(), dir, name, 6)
 	if err != nil {
 		return &Error{
 			cmd: c,
@@ -136,7 +136,7 @@ func migrateUp(c *cobra.Command, args []string) error {
 	}
 
 	dir := filepath.Join(c.Flag(flagNameDirectory).Value.String(), migrationsDirName)
-	migrations, err := spanner.LoadMigrations(dir)
+	migrations, err := spanner.ReadMigrations(ctx, dir)
 	if err != nil {
 		return &Error{
 			cmd: c,
@@ -223,12 +223,12 @@ func migrateSet(c *cobra.Command, args []string) error {
 	return nil
 }
 
-func createMigrationFile(dir string, name string, digits int) (string, error) {
+func createMigrationFile(ctx context.Context, dir string, name string, digits int) (string, error) {
 	if name != "" && !spanner.MigrationNameRegex.MatchString(name) {
 		return "", errors.New("Invalid migration file name.")
 	}
 
-	ms, err := spanner.LoadMigrations(dir)
+	ms, err := spanner.ReadMigrations(ctx, dir)
 	if err != nil {
 		return "", err
 	}

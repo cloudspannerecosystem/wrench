@@ -23,8 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-
+	"github.com/cloudspannerecosystem/wrench/internal/fs"
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
 )
@@ -57,7 +56,7 @@ func apply(c *cobra.Command, _ []string) error {
 			return errors.New("cannot specify DDL and DML at same time")
 		}
 
-		ddl, err := os.ReadFile(ddlFile)
+		ddl, err := fs.ReadFile(ctx, ddlFile)
 		if err != nil {
 			return &Error{
 				err: err,
@@ -81,7 +80,7 @@ func apply(c *cobra.Command, _ []string) error {
 	}
 
 	// apply dml
-	dml, err := os.ReadFile(dmlFile)
+	dml, err := fs.ReadFile(ctx, dmlFile)
 	if err != nil {
 		return &Error{
 			err: err,

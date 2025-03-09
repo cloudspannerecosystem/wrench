@@ -20,12 +20,14 @@
 package spanner
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
+
+	"github.com/cloudspannerecosystem/wrench/internal/fs"
 )
 
 var (
@@ -76,8 +78,8 @@ func (ms Migrations) Less(i, j int) bool {
 	return ms[i].Version < ms[j].Version
 }
 
-func LoadMigrations(dir string) (Migrations, error) {
-	files, err := os.ReadDir(dir)
+func ReadMigrations(ctx context.Context, dir string) (Migrations, error) {
+	files, err := fs.ReadDir(ctx, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +105,7 @@ func LoadMigrations(dir string) (Migrations, error) {
 			continue
 		}
 
-		file, err := os.ReadFile(filepath.Join(dir, filename))
+		file, err := fs.ReadFile(ctx, filepath.Join(dir, filename))
 		if err != nil {
 			continue
 		}
@@ -136,6 +138,11 @@ func LoadMigrations(dir string) (Migrations, error) {
 	}
 
 	return migrations, nil
+}
+
+// Deprecated: use ReadMigrations instead.
+func LoadMigrations(dir string) (Migrations, error) {
+	return ReadMigrations(context.Background(), dir)
 }
 
 func ddlToStatements(filename string, data []byte) ([]string, error) {
@@ -174,4 +181,3 @@ func inspectStatementsKind(statements []string) (statementKind, error) {
 		return "", errors.New("DDL, DML (INSERT), and partitioned DML (UPDATE or DELETE) must not be combined in the same migration file")
 	}
 }
-

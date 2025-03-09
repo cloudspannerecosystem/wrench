@@ -20,6 +20,7 @@
 package cmd_test
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,7 +50,7 @@ func TestCreateMigrationFile(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.filename, func(t *testing.T) {
-			filename, err := cmd.CreateMigrationFile(testdatadir, tc.filename, tc.digits)
+			filename, err := cmd.CreateMigrationFile(context.Background(), testdatadir, tc.filename, tc.digits)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -64,7 +65,7 @@ func TestCreateMigrationFile(t *testing.T) {
 	}
 
 	t.Run("invalid name", func(t *testing.T) {
-		_, err := cmd.CreateMigrationFile(testdatadir, "あああ", 6)
+		_, err := cmd.CreateMigrationFile(context.Background(), testdatadir, "あああ", 6)
 		if err.Error() != "Invalid migration file name." {
 			t.Errorf("err want `invalid name`, but got `%v`", err)
 		}

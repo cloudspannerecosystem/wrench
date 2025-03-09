@@ -21,10 +21,12 @@ package cmd
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"runtime/debug"
 	"time"
 
+	wrenchfs "github.com/cloudspannerecosystem/wrench/internal/fs"
 	"github.com/spf13/cobra"
 )
 
@@ -44,8 +46,22 @@ var (
 	timeout         time.Duration
 )
 
+// CustomFileSystemFunc is a function that returns a custom fs.FS.
+// This variable allows customizing what kind of fs.FS should be use in wrench CLI execution.
+// e.g. embed.FS for use.
+var CustomFileSystemFunc func() fs.FS
+
 var rootCmd = &cobra.Command{
 	Use: "wrench",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if CustomFileSystemFunc != nil {
+			ctx := cmd.Context()
+			ctx = wrenchfs.WithContext(ctx, CustomFileSystemFunc())
+			cmd.SetContext(ctx)
+		}
+
+		return nil
+	},
 }
 
 func Execute(ctx context.Context) error {
