@@ -897,6 +897,8 @@ github.com/ruudk/golang-pdf417 v0.0.0-20181029194003-1af4ab5afa58/go.mod h1:6lfF
 github.com/ruudk/golang-pdf417 v0.0.0-20201230142125-a7e3863a1245/go.mod h1:pQAZKsJ8yyVxGRWYNEm9oFB8ieLgKFnamEyDmSA0BRk=
 github.com/samber/lo v1.47.0 h1:z7RynLwP5nbyRscyvcD043DWYoOcYRv3mV8lBeqOCLc=
 github.com/samber/lo v1.47.0/go.mod h1:RmDH9Ct32Qy3gduHQuKJ3gW1fMHAnE/fAzQuf6He5cU=
+github.com/sivchari/xiter v0.0.0-20250319095728-a55fe39ec0cf h1:h1019XF5mCMGvOWUWiWU7CubLzlesW3cUsl5CTXwou8=
+github.com/sivchari/xiter v0.0.0-20250319095728-a55fe39ec0cf/go.mod h1:i4SlkNfFrn1974zbGZWg8FYXAWLnrS6cYAXtSfmIDhU=
 github.com/spaolacci/murmur3 v0.0.0-20180118202830-f09979ecbc72/go.mod h1:JwIasOWyU6f++ZhiEuf87xNszmSA2myDM2Kzu9HwQUA=
 github.com/spf13/afero v1.3.3/go.mod h1:5KUK8ByomD5Ti5Artl0RtHeI5pTF7MIDuXL3yY520V4=
 github.com/spf13/afero v1.6.0/go.mod h1:Ai8FlHk4v/PARR026UzYexafAt9roJ7LcLMAmO6Z93I=
@@ -1646,5 +1648,3 @@ rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8
 rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
-spheric.cloud/xiter v0.0.0-20240904151420-c999f37a46b2 h1:/2/LZep2TpsdSwYhdMsGRh+OVun1UMYlMEip4EEsgg8=
-spheric.cloud/xiter v0.0.0-20240904151420-c999f37a46b2/go.mod h1:i4SlkNfFrn1974zbGZWg8FYXAWLnrS6cYAXtSfmIDhU=
