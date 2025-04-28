@@ -7,7 +7,7 @@ toolchain go1.24.0
 require (
 	cloud.google.com/go/spanner v1.76.1
 	github.com/apstndb/gsqlutils v0.0.0-20241220021154-62754cd04acc
-	github.com/cloudspannerecosystem/memefish v0.4.0
+	github.com/cloudspannerecosystem/memefish v0.5.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/spf13/cobra v1.9.1
