@@ -6,8 +6,6 @@ SPANNER_EMULATOR_HOST_REST := localhost:9020
 export SPANNER_PROJECT_ID ?= wrench-test-project
 export SPANNER_INSTANCE_ID ?= wrench-test-instance
 
-REGISTRY := ghcr.io/cloudspannerecosystem/wrench
-
 .PHONY: test
 test:
 	go test -race -v ./...
@@ -23,6 +21,3 @@ build:
 
 setup-emulator:
 	curl -s "${SPANNER_EMULATOR_HOST_REST}/v1/projects/${SPANNER_PROJECT_ID}/instances" --data '{"instanceId": "'${SPANNER_INSTANCE_ID}'"}'
-
-docker-build:
-	docker build . -t $(REGISTRY):$(VERSION) --build-arg VERSION=$(VERSION)
