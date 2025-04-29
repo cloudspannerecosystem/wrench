@@ -59,7 +59,11 @@ var rootCmd = &cobra.Command{
 			ctx = wrenchfs.WithContext(ctx, CustomFileSystemFunc())
 			cmd.SetContext(ctx)
 		}
-
+		if CustomFileSystemFunc == nil {
+			if err := cobra.MarkFlagRequired(cmd.PersistentFlags(), flagNameDirectory); err != nil {
+				panic(err)
+			}
+		}
 		return nil
 	},
 }
@@ -90,10 +94,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&schemaFile, flagNameSchemaFile, "", "Name of schema file If not set, will use default 'schema.sql' file name")
 	rootCmd.PersistentFlags().StringVar(&credentialsFile, flagCredentialsFile, "", "Specify Credentials File")
 	rootCmd.PersistentFlags().DurationVar(&timeout, flagTimeout, time.Hour, "Context timeout")
-
-	if err := rootCmd.MarkFlagRequired(flagNameDirectory); err != nil {
-		panic(err)
-	}
 
 	rootCmd.Version = versionInfo()
 	rootCmd.SetVersionTemplate(versionTemplate)
