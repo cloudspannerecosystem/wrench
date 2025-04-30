@@ -118,6 +118,23 @@ This applies single DDL or DML.
 
 Use `wrench [command] --help` for more information about a command.
 
+### Embed migrations file to 1 binary
+
+`github.com/cloudspannerecosystem/wrench/cmd.CustomFileSystemFunc` is used to embed migration files into one binary.
+By default, `os.DirFS(".")` is used to read files.
+If you want to use a custom file system, you can create a custom wrench binary with overwrite this value.
+For example, you can use `embed.FS` to read files to create custom binary like below.
+
+```go
+//go:embed schema.sql migrations/*.sql
+var SpannerSchemaFS embed.FS
+
+func init() {
+    cmd.CustomFileSystemFunc = func() fs.FS {
+        return SpannerSchemaFS
+    }
+}
+```
 
 ## Contributions
 
