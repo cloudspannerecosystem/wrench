@@ -10,6 +10,10 @@ builds:
       - linux
       - windows
       - darwin
+    goarch:
+      - "386"
+      - amd64
+      - arm64
     ldflags:
       - -s -w -X github.com/cloudspannerecosystem/wrench/cmd.version={{.Version}}
     ignore:
@@ -32,3 +36,27 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+
+# https://goreleaser.com/customization/docker/
+dockers:
+- image_templates: ["ghcr.io/cloudspannerecosystem/{{ .ProjectName }}:{{ .Version }}-amd64"]
+  goarch: amd64
+  dockerfile: Dockerfile
+  use: buildx
+  build_flag_templates:
+  - --platform=linux/amd64
+- image_templates: ["ghcr.io/cloudspannerecosystem/{{ .ProjectName }}:{{ .Version }}-arm64v8"]
+  goarch: arm64
+  dockerfile: Dockerfile
+  use: buildx
+  build_flag_templates:
+  - --platform=linux/arm64/v8
+docker_manifests:
+- name_template: ghcr.io/cloudspannerecosystem/{{ .ProjectName }}:{{ .Version }}
+  image_templates:
+  - ghcr.io/cloudspannerecosystem/{{ .ProjectName }}:{{ .Version }}-amd64
+  - ghcr.io/cloudspannerecosystem/{{ .ProjectName }}:{{ .Version }}-arm64v8
+- name_template: ghcr.io/cloudspannerecosystem/{{ .ProjectName }}:latest
+  image_templates:
+  - ghcr.io/cloudspannerecosystem/{{ .ProjectName }}:{{ .Version }}-amd64
+  - ghcr.io/cloudspannerecosystem/{{ .ProjectName }}:{{ .Version }}-arm64v8
