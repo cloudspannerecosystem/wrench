@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	wrenchfs "github.com/cloudspannerecosystem/wrench/internal/fs"
@@ -64,7 +65,17 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+var markRequiredOnce sync.Once
+
 func Execute(ctx context.Context) error {
+	markRequiredOnce.Do(func() {
+		if CustomFileSystemFunc == nil {
+			if err := cobra.MarkFlagRequired(rootCmd.PersistentFlags(), flagNameDirectory); err != nil {
+				log.Fatal(err)
+			}
+		}
+	})
+
 	return rootCmd.ExecuteContext(ctx)
 }
 
@@ -93,12 +104,6 @@ func init() {
 
 	rootCmd.Version = versionInfo()
 	rootCmd.SetVersionTemplate(versionTemplate)
-
-	if CustomFileSystemFunc == nil {
-		if err := cobra.MarkFlagRequired(rootCmd.PersistentFlags(), flagNameDirectory); err != nil {
-			log.Fatal(err)
-		}
-	}
 }
 
 func spannerProjectID() string {
