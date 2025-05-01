@@ -22,7 +22,6 @@ package cmd
 import (
 	"context"
 	"io/fs"
-	"log"
 	"os"
 	"runtime/debug"
 	"time"
@@ -60,6 +59,11 @@ var rootCmd = &cobra.Command{
 			ctx = wrenchfs.WithContext(ctx, CustomFileSystemFunc())
 			cmd.SetContext(ctx)
 		}
+		if CustomFileSystemFunc == nil {
+			if err := cobra.MarkFlagRequired(cmd.PersistentFlags(), flagNameDirectory); err != nil {
+				panic(err)
+			}
+		}
 		return nil
 	},
 }
@@ -93,12 +97,6 @@ func init() {
 
 	rootCmd.Version = versionInfo()
 	rootCmd.SetVersionTemplate(versionTemplate)
-
-	if CustomFileSystemFunc == nil {
-		if err := cobra.MarkFlagRequired(rootCmd.PersistentFlags(), flagNameDirectory); err != nil {
-			log.Fatal(err)
-		}
-	}
 }
 
 func spannerProjectID() string {
