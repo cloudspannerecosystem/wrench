@@ -17,15 +17,19 @@ func FromContext(ctx context.Context) fs.FS {
 	if ok && fsys != nil {
 		return fsys
 	}
-	return os.DirFS(".")
+	return nil
 }
 
 func ReadFile(ctx context.Context, path string) ([]byte, error) {
-	fsys := FromContext(ctx)
-	return fs.ReadFile(fsys, path)
+	if fsys := FromContext(ctx); fsys != nil {
+		return fs.ReadFile(fsys, path)
+	}
+	return os.ReadFile(path)
 }
 
 func ReadDir(ctx context.Context, path string) ([]fs.DirEntry, error) {
-	fsys := FromContext(ctx)
-	return fs.ReadDir(fsys, path)
+	if fsys := FromContext(ctx); fsys != nil {
+		return fs.ReadDir(fsys, path)
+	}
+	return os.ReadDir(path)
 }
