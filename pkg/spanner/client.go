@@ -105,9 +105,9 @@ func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte
 	}
 
 	createReq := &databasepb.CreateDatabaseRequest{
-		Parent:          fmt.Sprintf("projects/%s/instances/%s", c.config.Project, c.config.Instance),
-		CreateStatement: fmt.Sprintf("CREATE DATABASE `%s`", c.config.Database),
-		ExtraStatements: statements,
+		Parent:           fmt.Sprintf("projects/%s/instances/%s", c.config.Project, c.config.Instance),
+		CreateStatement:  fmt.Sprintf("CREATE DATABASE `%s`", c.config.Database),
+		ExtraStatements:  statements,
 		ProtoDescriptors: protoDescriptors,
 	}
 
@@ -224,8 +224,8 @@ func (c *Client) ApplyDDLFile(ctx context.Context, filename string, ddl []byte, 
 
 func (c *Client) ApplyDDL(ctx context.Context, statements []string, protoDescriptors []byte) error {
 	req := &databasepb.UpdateDatabaseDdlRequest{
-		Database:   c.config.URL(),
-		Statements: statements,
+		Database:         c.config.URL(),
+		Statements:       statements,
 		ProtoDescriptors: protoDescriptors,
 	}
 

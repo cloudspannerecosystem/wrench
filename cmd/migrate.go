@@ -38,7 +38,6 @@ const (
 	migrationTableName = "SchemaMigrations"
 )
 
-
 // migrateCmd represents the migrate command
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",

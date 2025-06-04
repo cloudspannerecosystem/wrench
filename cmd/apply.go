@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"github.com/cloudspannerecosystem/wrench/internal/fs"
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"

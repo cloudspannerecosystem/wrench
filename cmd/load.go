@@ -22,11 +22,9 @@ package cmd
 import (
 	"context"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
-
 
 var loadCmd = &cobra.Command{
 	Use:   "load",

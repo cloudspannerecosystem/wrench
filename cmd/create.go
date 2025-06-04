@@ -21,11 +21,9 @@ package cmd
 
 import (
 	"context"
-	"path/filepath"
 	"github.com/cloudspannerecosystem/wrench/internal/fs"
 	"github.com/spf13/cobra"
 )
-
 
 var createCmd = &cobra.Command{
 	Use:   "create",
@@ -52,17 +50,17 @@ func create(c *cobra.Command, _ []string) error {
 		}
 	}
 
-		var protoDescriptor []byte
-		protoDescriptorFile := protoDescriptorFilePath(c)
-		if protoDescriptorFile != "" {
-			protoDescriptor, err = fs.ReadFile(ctx, protoDescriptorFile)
-			if err != nil {
-				return &Error{
-					err: err,
-					cmd: c,
-				}
+	var protoDescriptor []byte
+	protoDescriptorFile := protoDescriptorFilePath(c)
+	if protoDescriptorFile != "" {
+		protoDescriptor, err = fs.ReadFile(ctx, protoDescriptorFile)
+		if err != nil {
+			return &Error{
+				err: err,
+				cmd: c,
 			}
 		}
+	}
 
 	err = client.CreateDatabase(ctx, filename, ddl, protoDescriptor)
 	if err != nil {
