@@ -42,7 +42,7 @@ func load(c *cobra.Command, _ []string) error {
 	}
 	defer client.Close()
 
-	ddl, err := client.LoadDDL(ctx)
+	ddl, protoDescriptors, err := client.LoadDDL(ctx)
 	if err != nil {
 		return &Error{
 			err: err,
@@ -55,6 +55,17 @@ func load(c *cobra.Command, _ []string) error {
 		return &Error{
 			err: err,
 			cmd: c,
+		}
+	}
+
+	protoDescriptorFile := protoDescriptorFilePath(c)
+	if protoDescriptorFile != "" && len(protoDescriptors) > 0 {
+		err = os.WriteFile(protoDescriptorFile, protoDescriptors, 0o664)
+		if err != nil {
+			return &Error{
+				err: err,
+				cmd: c,
+			}
 		}
 	}
 

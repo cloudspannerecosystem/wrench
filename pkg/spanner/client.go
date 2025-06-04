@@ -187,12 +187,12 @@ func (c *Client) TruncateAllTables(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) LoadDDL(ctx context.Context) ([]byte, error) {
+func (c *Client) LoadDDL(ctx context.Context) ([]byte, []byte, error) {
 	req := &databasepb.GetDatabaseDdlRequest{Database: c.config.URL()}
 
 	res, err := c.spannerAdminClient.GetDatabaseDdl(ctx, req)
 	if err != nil {
-		return nil, &Error{
+		return nil, nil, &Error{
 			Code: ErrorCodeLoadSchema,
 			err:  err,
 		}
@@ -210,7 +210,7 @@ func (c *Client) LoadDDL(ctx context.Context) ([]byte, error) {
 		schema = append(schema[:], []byte(statement)[:]...)
 	}
 
-	return schema, nil
+	return schema, res.ProtoDescriptors, nil
 }
 
 func (c *Client) ApplyDDLFile(ctx context.Context, filename string, ddl []byte, protoDescriptors []byte) error {
