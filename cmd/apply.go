@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"github.com/cloudspannerecosystem/wrench/internal/fs"
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
@@ -149,4 +150,5 @@ func init() {
 	applyCmd.PersistentFlags().StringVar(&dmlFile, flagDMLFile, "", "DML file to be applied")
 	applyCmd.PersistentFlags().BoolVar(&partitioned, flagPartitioned, false, "Whether given DML should be executed as a Partitioned-DML or not")
 	applyCmd.PersistentFlags().StringVar(&priority, flagPriority, "", "The priority to apply DML(optional)")
+	applyCmd.PersistentFlags().String(flagProtoDescriptorFile, "", "Proto descriptor file to be used with DDL operations")
 }

@@ -38,6 +38,7 @@ const (
 	migrationTableName = "SchemaMigrations"
 )
 
+
 // migrateCmd represents the migrate command
 var migrateCmd = &cobra.Command{
 	Use:   "migrate",
@@ -65,6 +66,8 @@ func init() {
 		Short: "Set version V but don't run migration (ignores dirty state)",
 		RunE:  migrateSet,
 	}
+
+	migrateUpCmd.Flags().String(flagProtoDescriptorFile, "", "Proto descriptor file to be used with migrations")
 
 	migrateCmd.AddCommand(
 		migrateCreateCmd,

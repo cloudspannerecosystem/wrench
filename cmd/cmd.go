@@ -92,9 +92,16 @@ func schemaFilePath(c *cobra.Command) string {
 }
 
 func protoDescriptorFilePath(c *cobra.Command) string {
-	filename := c.Flag(flagProtoDescriptorFile).Value.String()
+	var filename string
+	
+	// Try to get the flag value from the specific command
+	if flag := c.Flag(flagProtoDescriptorFile); flag != nil {
+		filename = flag.Value.String()
+	}
+	
 	if filename == "" {
 		return ""
 	}
+
 	return filepath.Join(c.Flag(flagNameDirectory).Value.String(), filename)
 }

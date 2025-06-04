@@ -22,9 +22,11 @@ package cmd
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
+
 
 var loadCmd = &cobra.Command{
 	Use:   "load",
@@ -70,4 +72,8 @@ func load(c *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+func init() {
+	loadCmd.Flags().String(flagProtoDescriptorFile, "", "Proto descriptor file name for output. If specified and proto descriptors exist, they will be written to this file")
 }

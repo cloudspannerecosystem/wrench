@@ -21,9 +21,11 @@ package cmd
 
 import (
 	"context"
+	"path/filepath"
 	"github.com/cloudspannerecosystem/wrench/internal/fs"
 	"github.com/spf13/cobra"
 )
+
 
 var createCmd = &cobra.Command{
 	Use:   "create",
@@ -71,4 +73,8 @@ func create(c *cobra.Command, _ []string) error {
 	}
 
 	return nil
+}
+
+func init() {
+	createCmd.Flags().String(flagProtoDescriptorFile, "", "Proto descriptor file to be used with database creation")
 }
