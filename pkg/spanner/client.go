@@ -95,7 +95,7 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte) error {
+func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte, protoDescriptors []byte) error {
 	statements, err := ddlToStatements(filename, ddl)
 	if err != nil {
 		return &Error{
@@ -108,6 +108,7 @@ func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte
 		Parent:          fmt.Sprintf("projects/%s/instances/%s", c.config.Project, c.config.Instance),
 		CreateStatement: fmt.Sprintf("CREATE DATABASE `%s`", c.config.Database),
 		ExtraStatements: statements,
+		ProtoDescriptors: protoDescriptors,
 	}
 
 	op, err := c.spannerAdminClient.CreateDatabase(ctx, createReq)
@@ -212,19 +213,20 @@ func (c *Client) LoadDDL(ctx context.Context) ([]byte, error) {
 	return schema, nil
 }
 
-func (c *Client) ApplyDDLFile(ctx context.Context, filename string, ddl []byte) error {
+func (c *Client) ApplyDDLFile(ctx context.Context, filename string, ddl []byte, protoDescriptors []byte) error {
 	statements, err := ddlToStatements(filename, ddl)
 	if err != nil {
 		return err
 	}
 
-	return c.ApplyDDL(ctx, statements)
+	return c.ApplyDDL(ctx, statements, protoDescriptors)
 }
 
-func (c *Client) ApplyDDL(ctx context.Context, statements []string) error {
+func (c *Client) ApplyDDL(ctx context.Context, statements []string, protoDescriptors []byte) error {
 	req := &databasepb.UpdateDatabaseDdlRequest{
 		Database:   c.config.URL(),
 		Statements: statements,
+		ProtoDescriptors: protoDescriptors,
 	}
 
 	op, err := c.spannerAdminClient.UpdateDatabaseDdl(ctx, req)
@@ -326,7 +328,7 @@ func (c *Client) ApplyPartitionedDML(ctx context.Context, statements []string, p
 	return numAffectedRows, nil
 }
 
-func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, limit int, tableName string) error {
+func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, limit int, tableName string, protoDescriptors []byte) error {
 	sort.Sort(migrations)
 
 	version, dirty, err := c.GetSchemaMigrationVersion(ctx, tableName)
@@ -366,7 +368,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 
 		switch m.kind {
 		case statementKindDDL:
-			if err := c.ApplyDDL(ctx, m.Statements); err != nil {
+			if err := c.ApplyDDL(ctx, m.Statements, protoDescriptors); err != nil {
 				return &Error{
 					Code: ErrorCodeExecuteMigrations,
 					err:  err,
@@ -490,7 +492,7 @@ func (c *Client) EnsureMigrationTable(ctx context.Context, tableName string) err
     Dirty    BOOL NOT NULL
 	) PRIMARY KEY(Version)`, tableName)
 
-	return c.ApplyDDL(ctx, []string{stmt})
+	return c.ApplyDDL(ctx, []string{stmt}, nil)
 }
 
 func (c *Client) Close() error {

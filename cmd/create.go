@@ -50,7 +50,19 @@ func create(c *cobra.Command, _ []string) error {
 		}
 	}
 
-	err = client.CreateDatabase(ctx, filename, ddl)
+		var protoDescriptor []byte
+		protoDescriptorFile := protoDescriptorFilePath(c)
+		if protoDescriptorFile != "" {
+			protoDescriptor, err = fs.ReadFile(ctx, protoDescriptorFile)
+			if err != nil {
+				return &Error{
+					err: err,
+					cmd: c,
+				}
+			}
+		}
+
+	err = client.CreateDatabase(ctx, filename, ddl, protoDescriptor)
 	if err != nil {
 		return &Error{
 			err: err,

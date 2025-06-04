@@ -41,6 +41,7 @@ const (
 	flagPriority          = "priority"
 	flagNode              = "node"
 	flagTimeout           = "timeout"
+	flagProtoDescriptorFile = "proto_descriptor_file"
 	defaultSchemaFileName = "schema.sql"
 )
 
@@ -86,6 +87,14 @@ func schemaFilePath(c *cobra.Command) string {
 	filename := c.Flag(flagNameSchemaFile).Value.String()
 	if filename == "" {
 		filename = defaultSchemaFileName
+	}
+	return filepath.Join(c.Flag(flagNameDirectory).Value.String(), filename)
+}
+
+func protoDescriptorFilePath(c *cobra.Command) string {
+	filename := c.Flag(flagProtoDescriptorFile).Value.String()
+	if filename == "" {
+		return ""
 	}
 	return filepath.Join(c.Flag(flagNameDirectory).Value.String(), filename)
 }

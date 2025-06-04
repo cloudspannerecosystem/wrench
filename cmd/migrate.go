@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cloudspannerecosystem/wrench/internal/fs"
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
 )
@@ -144,7 +145,19 @@ func migrateUp(c *cobra.Command, args []string) error {
 		}
 	}
 
-	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName)
+	var protoDescriptor []byte
+	protoDescriptorFile := protoDescriptorFilePath(c)
+	if protoDescriptorFile != "" {
+		protoDescriptor, err = fs.ReadFile(ctx, protoDescriptorFile)
+		if err != nil {
+			return &Error{
+				err: err,
+				cmd: c,
+			}
+		}
+	}
+
+	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName, protoDescriptor)
 }
 
 func migrateVersion(c *cobra.Command, _ []string) error {

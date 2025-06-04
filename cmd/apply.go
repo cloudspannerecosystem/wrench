@@ -64,7 +64,19 @@ func apply(c *cobra.Command, _ []string) error {
 			}
 		}
 
-		err = client.ApplyDDLFile(ctx, ddlFile, ddl)
+		var protoDescriptor []byte
+		protoDescriptorFile := protoDescriptorFilePath(c)
+		if protoDescriptorFile != "" {
+			protoDescriptor, err = fs.ReadFile(ctx, protoDescriptorFile)
+			if err != nil {
+				return &Error{
+					err: err,
+					cmd: c,
+				}
+			}
+		}
+
+		err = client.ApplyDDLFile(ctx, ddlFile, ddl, protoDescriptor)
 		if err != nil {
 			return &Error{
 				err: err,
