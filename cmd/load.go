@@ -42,7 +42,7 @@ func load(c *cobra.Command, _ []string) error {
 	}
 	defer client.Close()
 
-	ddl, err := client.LoadDDL(ctx)
+	ddl, protoDescriptors, err := client.LoadDDL(ctx)
 	if err != nil {
 		return &Error{
 			err: err,
@@ -58,5 +58,20 @@ func load(c *cobra.Command, _ []string) error {
 		}
 	}
 
+	protoDescriptorFile := protoDescriptorFilePath(c)
+	if protoDescriptorFile != "" && len(protoDescriptors) > 0 {
+		err = os.WriteFile(protoDescriptorFile, protoDescriptors, 0o664)
+		if err != nil {
+			return &Error{
+				err: err,
+				cmd: c,
+			}
+		}
+	}
+
 	return nil
+}
+
+func init() {
+	loadCmd.Flags().String(flagProtoDescriptorFile, "", "Proto descriptor file name for output. If specified and proto descriptors exist, they will be written to this file")
 }
