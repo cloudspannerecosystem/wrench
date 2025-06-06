@@ -326,7 +326,7 @@ func (c *Client) ApplyPartitionedDML(ctx context.Context, statements []string, p
 	return numAffectedRows, nil
 }
 
-func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, limit int, tableName string) error {
+func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, limit int, tableName string, priorityType PriorityType) error {
 	sort.Sort(migrations)
 
 	version, dirty, err := c.GetSchemaMigrationVersion(ctx, tableName)
@@ -373,14 +373,14 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 				}
 			}
 		case statementKindDML:
-			if _, err := c.ApplyDML(ctx, m.Statements, PriorityTypeUnspecified); err != nil {
+			if _, err := c.ApplyDML(ctx, m.Statements, priorityType); err != nil {
 				return &Error{
 					Code: ErrorCodeExecuteMigrations,
 					err:  err,
 				}
 			}
 		case statementKindPartitionedDML:
-			if _, err := c.ApplyPartitionedDML(ctx, m.Statements, PriorityTypeUnspecified); err != nil {
+			if _, err := c.ApplyPartitionedDML(ctx, m.Statements, priorityType); err != nil {
 				return &Error{
 					Code: ErrorCodeExecuteMigrations,
 					err:  err,

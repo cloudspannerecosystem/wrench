@@ -225,7 +225,7 @@ func TestExecuteMigrations(t *testing.T) {
 	}
 
 	// only apply 000002.sql by specifying limit 1.
-	if err := client.ExecuteMigrations(ctx, migrations, 1, migrationTable); err != nil {
+	if err := client.ExecuteMigrations(ctx, migrations, 1, migrationTable, PriorityTypeUnspecified); err != nil {
 		t.Fatalf("failed to execute migration: %v", err)
 	}
 
@@ -233,7 +233,7 @@ func TestExecuteMigrations(t *testing.T) {
 	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "YES")
 	ensureMigrationVersionRecord(t, ctx, client, 2, false)
 
-	if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable); err != nil {
+	if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable, PriorityTypeUnspecified); err != nil {
 		t.Fatalf("failed to execute migration: %v", err)
 	}
 
