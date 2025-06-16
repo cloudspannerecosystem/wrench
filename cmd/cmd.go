@@ -29,19 +29,20 @@ import (
 )
 
 const (
-	flagNameProject       = "project"
-	flagNameInstance      = "instance"
-	flagNameDatabase      = "database"
-	flagNameDirectory     = "directory"
-	flagCredentialsFile   = "credentials_file"
-	flagNameSchemaFile    = "schema_file"
-	flagDDLFile           = "ddl"
-	flagDMLFile           = "dml"
-	flagPartitioned       = "partitioned"
-	flagPriority          = "priority"
-	flagNode              = "node"
-	flagTimeout           = "timeout"
-	defaultSchemaFileName = "schema.sql"
+	flagNameProject         = "project"
+	flagNameInstance        = "instance"
+	flagNameDatabase        = "database"
+	flagNameDirectory       = "directory"
+	flagCredentialsFile     = "credentials_file"
+	flagNameSchemaFile      = "schema_file"
+	flagDDLFile             = "ddl"
+	flagDMLFile             = "dml"
+	flagPartitioned         = "partitioned"
+	flagPriority            = "priority"
+	flagNode                = "node"
+	flagTimeout             = "timeout"
+	flagProtoDescriptorFile = "proto_descriptor_file"
+	defaultSchemaFileName   = "schema.sql"
 )
 
 func newSpannerClient(ctx context.Context, c *cobra.Command) (*spanner.Client, error) {
@@ -87,5 +88,20 @@ func schemaFilePath(c *cobra.Command) string {
 	if filename == "" {
 		filename = defaultSchemaFileName
 	}
+	return filepath.Join(c.Flag(flagNameDirectory).Value.String(), filename)
+}
+
+func protoDescriptorFilePath(c *cobra.Command) string {
+	var filename string
+
+	// Try to get the flag value from the specific command
+	if flag := c.Flag(flagProtoDescriptorFile); flag != nil {
+		filename = flag.Value.String()
+	}
+
+	if filename == "" {
+		return ""
+	}
+
 	return filepath.Join(c.Flag(flagNameDirectory).Value.String(), filename)
 }

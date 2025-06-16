@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cloudspannerecosystem/wrench/internal/fs"
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
 )
@@ -64,6 +65,8 @@ func init() {
 		Short: "Set version V but don't run migration (ignores dirty state)",
 		RunE:  migrateSet,
 	}
+
+	migrateUpCmd.Flags().String(flagProtoDescriptorFile, "", "Proto descriptor file to be used with migrations")
 
 	migrateCmd.AddCommand(
 		migrateCreateCmd,
@@ -154,7 +157,19 @@ func migrateUp(c *cobra.Command, args []string) error {
 		}
 	}
 
-	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName, priorityType)
+	var protoDescriptor []byte
+	protoDescriptorFile := protoDescriptorFilePath(c)
+	if protoDescriptorFile != "" {
+		protoDescriptor, err = fs.ReadFile(ctx, protoDescriptorFile)
+		if err != nil {
+			return &Error{
+				err: err,
+				cmd: c,
+			}
+		}
+	}
+
+	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName, priorityType, protoDescriptor)
 }
 
 func migrateVersion(c *cobra.Command, _ []string) error {

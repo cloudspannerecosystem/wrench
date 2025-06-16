@@ -68,7 +68,7 @@ func TestLoadDDL(t *testing.T) {
 	client, done := testClientWithDatabase(t, ctx)
 	defer done()
 
-	gotDDL, err := client.LoadDDL(ctx)
+	gotDDL, gotProtoDescriptors, err := client.LoadDDL(ctx)
 	if err != nil {
 		t.Fatalf("failed to load ddl: %v", err)
 	}
@@ -81,49 +81,69 @@ func TestLoadDDL(t *testing.T) {
 	if want, got := string(wantDDL), string(gotDDL); want != got {
 		t.Errorf("want: \n%s\n but got: \n%s", want, got)
 	}
+
+	// Proto descriptors should be empty for a basic schema
+	if gotProtoDescriptors != nil && len(gotProtoDescriptors) > 0 {
+		t.Errorf("expected empty proto descriptors for basic schema, got %d bytes", len(gotProtoDescriptors))
+	}
 }
 
 func TestApplyDDLFile(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	ddl, err := os.ReadFile("testdata/ddl.sql")
-	if err != nil {
-		t.Fatalf("failed to read ddl file: %v", err)
-	}
-
-	client, done := testClientWithDatabase(t, ctx)
-	defer done()
-
-	if err := client.ApplyDDLFile(ctx, "testdata/ddl.sql", ddl); err != nil {
-		t.Fatalf("failed to apply ddl file: %v", err)
-	}
-
-	ri := client.spannerClient.Single().Query(ctx, spanner.Statement{
-		SQL: "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_catalog = '' AND table_name = @table AND column_name = @column",
-		Params: map[string]interface{}{
-			"table":  singerTable,
-			"column": "Foo",
+	tests := map[string]struct {
+		protoDescriptors []byte
+	}{
+		"without proto descriptors": {
+			protoDescriptors: nil,
 		},
-	})
-	defer ri.Stop()
-
-	row, err := ri.Next()
-	if err == iterator.Done {
-		t.Fatalf("failed to get table information: %v", err)
+		"with empty proto descriptors": {
+			protoDescriptors: []byte{},
+		},
 	}
 
-	c := &column{}
-	if err := row.ToStruct(c); err != nil {
-		t.Fatalf("failed to convert row to struct: %v", err)
-	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ddl, err := os.ReadFile("testdata/ddl.sql")
+			if err != nil {
+				t.Fatalf("failed to read ddl file: %v", err)
+			}
 
-	if want, got := "Foo", c.ColumnName; want != got {
-		t.Errorf("want %s, but got %s", want, got)
-	}
+			client, done := testClientWithDatabase(t, ctx)
+			defer done()
 
-	if want, got := "STRING(MAX)", c.SpannerType; want != got {
-		t.Errorf("want %s, but got %s", want, got)
+			if err := client.ApplyDDLFile(ctx, "testdata/ddl.sql", ddl, test.protoDescriptors); err != nil {
+				t.Fatalf("failed to apply ddl file: %v", err)
+			}
+
+			ri := client.spannerClient.Single().Query(ctx, spanner.Statement{
+				SQL: "SELECT column_name, spanner_type FROM information_schema.columns WHERE table_catalog = '' AND table_name = @table AND column_name = @column",
+				Params: map[string]interface{}{
+					"table":  singerTable,
+					"column": "Foo",
+				},
+			})
+			defer ri.Stop()
+
+			row, err := ri.Next()
+			if err == iterator.Done {
+				t.Fatalf("failed to get table information: %v", err)
+			}
+
+			c := &column{}
+			if err := row.ToStruct(c); err != nil {
+				t.Fatalf("failed to convert row to struct: %v", err)
+			}
+
+			if want, got := "Foo", c.ColumnName; want != got {
+				t.Errorf("want %s, but got %s", want, got)
+			}
+
+			if want, got := "STRING(MAX)", c.SpannerType; want != got {
+				t.Errorf("want %s, but got %s", want, got)
+			}
+		})
 	}
 }
 
@@ -205,45 +225,60 @@ func TestExecuteMigrations(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	client, done := testClientWithDatabase(t, ctx)
-	defer done()
-
-	// to ensure partitioned-dml (000003.sql) will be applied correctly, insert a row before migration.
-	_, err := client.spannerClient.Apply(
-		ctx,
-		[]*spanner.Mutation{
-			spanner.Insert(singerTable, []string{"SingerID", "FirstName"}, []interface{}{"1", "foo"}),
+	tests := map[string]struct {
+		protoDescriptors []byte
+	}{
+		"without proto descriptors": {
+			protoDescriptors: nil,
 		},
-	)
-	if err != nil {
-		t.Fatalf("failed to apply mutation: %v", err)
+		"with empty proto descriptors": {
+			protoDescriptors: []byte{},
+		},
 	}
 
-	migrations, err := ReadMigrations(ctx, "testdata/migrations")
-	if err != nil {
-		t.Fatalf("failed to load migrations: %v", err)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			client, done := testClientWithDatabase(t, ctx)
+			defer done()
+
+			// to ensure partitioned-dml (000003.sql) will be applied correctly, insert a row before migration.
+			_, err := client.spannerClient.Apply(
+				ctx,
+				[]*spanner.Mutation{
+					spanner.Insert(singerTable, []string{"SingerID", "FirstName"}, []interface{}{"1", "foo"}),
+				},
+			)
+			if err != nil {
+				t.Fatalf("failed to apply mutation: %v", err)
+			}
+
+			migrations, err := ReadMigrations(ctx, "testdata/migrations")
+			if err != nil {
+				t.Fatalf("failed to load migrations: %v", err)
+			}
+
+			// only apply 000002.sql by specifying limit 1.
+			if err := client.ExecuteMigrations(ctx, migrations, 1, migrationTable, PriorityTypeUnspecified, test.protoDescriptors); err != nil {
+				t.Fatalf("failed to execute migration: %v", err)
+			}
+
+			// ensure that only 000002.sql has been applied.
+			ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "YES")
+			ensureMigrationVersionRecord(t, ctx, client, 2, false)
+
+			if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable, PriorityTypeUnspecified, test.protoDescriptors); err != nil {
+				t.Fatalf("failed to execute migration: %v", err)
+			}
+
+			// ensure that 000003.sql, 000004.sql and 000005.sql have been applied.
+			ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "NO")
+			ensureMigrationVersionRecord(t, ctx, client, 5, false)
+
+			// ensure that schema is not changed and ExecuteMigrate is safely finished even though no migrations should be applied.
+			ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "NO")
+			ensureMigrationVersionRecord(t, ctx, client, 5, false)
+		})
 	}
-
-	// only apply 000002.sql by specifying limit 1.
-	if err := client.ExecuteMigrations(ctx, migrations, 1, migrationTable, PriorityTypeUnspecified); err != nil {
-		t.Fatalf("failed to execute migration: %v", err)
-	}
-
-	// ensure that only 000002.sql has been applied.
-	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "YES")
-	ensureMigrationVersionRecord(t, ctx, client, 2, false)
-
-	if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable, PriorityTypeUnspecified); err != nil {
-		t.Fatalf("failed to execute migration: %v", err)
-	}
-
-	// ensure that 000003.sql, 000004.sql and 000005.sql have been applied.
-	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "NO")
-	ensureMigrationVersionRecord(t, ctx, client, 5, false)
-
-	// ensure that schema is not changed and ExecuteMigrate is safely finished even though no migrations should be applied.
-	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "NO")
-	ensureMigrationVersionRecord(t, ctx, client, 5, false)
 }
 
 func ensureMigrationColumn(t *testing.T, ctx context.Context, client *Client, columnName, spannerType, isNullable string) {
@@ -441,6 +476,97 @@ func TestPriorityPBOf(t *testing.T) {
 	}
 }
 
+func TestCreateDatabase(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	tests := map[string]struct {
+		protoDescriptors []byte
+	}{
+		"without proto descriptors": {
+			protoDescriptors: nil,
+		},
+		"with empty proto descriptors": {
+			protoDescriptors: []byte{},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if v := os.Getenv(envSpannerEmulatorHost); v == "" {
+				t.Fatal("test must use spanner emulator")
+			}
+
+			project := os.Getenv(envSpannerProjectID)
+			if project == "" {
+				t.Fatalf("must set %s", envSpannerProjectID)
+			}
+
+			instance := os.Getenv(envSpannerInstanceID)
+			if instance == "" {
+				t.Fatalf("must set %s", envSpannerInstanceID)
+			}
+
+			id := uuid.New()
+			database := fmt.Sprintf("test-%s", id.String()[:18])
+			t.Logf("database %v\n", database)
+
+			config := &Config{
+				Project:  project,
+				Instance: instance,
+				Database: database,
+			}
+
+			client, err := NewClient(ctx, config)
+			if err != nil {
+				t.Fatalf("failed to create spanner client: %v", err)
+			}
+
+			ddl, err := os.ReadFile("testdata/schema.sql")
+			if err != nil {
+				t.Fatalf("failed to read schema file: %v", err)
+			}
+
+			if err := client.CreateDatabase(ctx, "testdata/schema.sql", ddl, test.protoDescriptors); err != nil {
+				t.Fatalf("failed to create database: %v", err)
+			}
+
+			// Verify database was created successfully by checking if we can connect
+			client.Close()
+			client, err = NewClient(ctx, config)
+			if err != nil {
+				t.Fatalf("failed to reconnect to created database: %v", err)
+			}
+
+			// Verify tables were created
+			ri := client.spannerClient.Single().Query(ctx, spanner.Statement{
+				SQL: "SELECT table_name FROM information_schema.tables WHERE table_catalog = '' AND table_name = @table",
+				Params: map[string]interface{}{
+					"table": singerTable,
+				},
+			})
+			defer ri.Stop()
+
+			row, err := ri.Next()
+			if err == iterator.Done {
+				t.Fatalf("failed to find expected table: %v", err)
+			}
+
+			ta := &table{}
+			if err := row.ToStruct(ta); err != nil {
+				t.Fatalf("failed to convert row to struct: %v", err)
+			}
+
+			if want, got := singerTable, ta.TableName; want != got {
+				t.Errorf("want %s, but got %s", want, got)
+			}
+
+			// Clean up
+			client.Close()
+		})
+	}
+}
+
 func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func()) {
 	t.Helper()
 
@@ -478,7 +604,7 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 		t.Fatalf("failed to read schema file: %v", err)
 	}
 
-	if err := client.CreateDatabase(ctx, "testdata/schema.sql", ddl); err != nil {
+	if err := client.CreateDatabase(ctx, "testdata/schema.sql", ddl, nil); err != nil {
 		t.Fatalf("failed to create database: %v", err)
 	}
 
