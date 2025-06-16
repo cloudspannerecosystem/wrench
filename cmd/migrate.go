@@ -76,6 +76,8 @@ func init() {
 	)
 
 	migrateCmd.PersistentFlags().String(flagNameDirectory, "", "Directory that migration files placed (required)")
+
+	migrateUpCmd.PersistentFlags().StringVar(&priority, flagPriority, "", "The priority to apply DML (optional)")
 }
 
 func migrateCreate(c *cobra.Command, args []string) error {
@@ -125,6 +127,14 @@ func migrateUp(c *cobra.Command, args []string) error {
 		limit = n
 	}
 
+	priorityType, err := priorityTypeOf(priority)
+	if err != nil {
+		return &Error{
+			cmd: c,
+			err: err,
+		}
+	}
+
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
 		return err
@@ -159,7 +169,7 @@ func migrateUp(c *cobra.Command, args []string) error {
 		}
 	}
 
-	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName, protoDescriptor)
+	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName, priorityType, protoDescriptor)
 }
 
 func migrateVersion(c *cobra.Command, _ []string) error {
