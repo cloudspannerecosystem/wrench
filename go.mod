@@ -66,3 +66,5 @@ require (
 	google.golang.org/protobuf v1.36.5 // indirect
 	spheric.cloud/xiter v0.0.0-20240904151420-c999f37a46b2 // indirect
 )
+
+replace spheric.cloud/xiter v0.0.0-20240904151420-c999f37a46b2 => github.com/sivchari/xiter v0.0.0-20250319095728-a55fe39ec0cf
