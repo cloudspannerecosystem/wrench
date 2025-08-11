@@ -171,7 +171,6 @@ func (c *Client) TruncateAllTables(ctx context.Context) error {
 
 	g := &multierror.Group{}
 	for _, stmt := range stms {
-		stmt := stmt
 		g.Go(func() error {
 			_, err := c.spannerClient.PartitionedUpdate(ctx, stmt)
 			return err
