@@ -108,6 +108,16 @@ $ wrench migrate up --directory ./_examples
 
 This executes migrations. This also creates `SchemaMigrations` table into your database to manage schema version if it does not exist.
 
+### Use custom migration table
+
+By default, wrench uses `SchemaMigrations` table to manage migration versions. You can specify a custom table name using `--migration-table-name` flag:
+
+```sh
+$ wrench migrate up --directory ./_examples --migration-table-name DataMigrations
+```
+
+This is useful when you want to manage multiple migration systems in one database (e.g., schema migrations and data migrations separately).
+
 ### Apply single DDL/DML
 
 ```sh
