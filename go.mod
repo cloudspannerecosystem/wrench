@@ -1,6 +1,6 @@
 module github.com/cloudspannerecosystem/wrench
 
-go 1.25.0
+go 1.25.9
 
 require (
 	cloud.google.com/go/spanner v1.76.1
