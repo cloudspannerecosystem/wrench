@@ -9,7 +9,8 @@ import (
 var node int32
 
 var instanceCmd = &cobra.Command{
-	Use: "instance",
+	Use:   "instance",
+	Short: "Manipulate an instance",
 }
 
 var instanceCreateCmd = &cobra.Command{
