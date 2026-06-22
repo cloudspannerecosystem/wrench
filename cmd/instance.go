@@ -15,7 +15,7 @@ var instanceCmd = &cobra.Command{
 
 var instanceCreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Create a instance",
+	Short: "Create an instance",
 	RunE:  instanceCreate,
 }
 
@@ -42,8 +42,8 @@ func instanceCreate(c *cobra.Command, _ []string) error {
 
 var instanceDeleteCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "Delete a instance",
-	Long:  "Delete a instance. This command will delete databases immediately and irrevocably disappear",
+	Short: "Delete an instance",
+	Long:  "Delete an instance. This command will delete databases immediately and irrevocably disappear",
 	RunE:  instanceDelete,
 }
 
