@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/cloudspannerecosystem/wrench/cmd"
+	"github.com/spf13/cobra"
 )
 
 func TestCreateMigrationFile(t *testing.T) {
@@ -70,4 +71,36 @@ func TestCreateMigrationFile(t *testing.T) {
 			t.Errorf("err want `invalid name`, but got `%v`", err)
 		}
 	})
+}
+
+func TestGetMigrationTableName(t *testing.T) {
+	tests := []struct {
+		name      string
+		flagValue string
+		want      string
+	}{
+		{
+			name:      "default value",
+			flagValue: "",
+			want:      "SchemaMigrations",
+		},
+		{
+			name:      "custom table name",
+			flagValue: "DataMigrations",
+			want:      "DataMigrations",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &cobra.Command{}
+			c.Flags().String("migration-table-name", "SchemaMigrations", "")
+			if tc.flagValue != "" {
+				c.Flags().Set("migration-table-name", tc.flagValue)
+			}
+			got := cmd.GetMigrationTableName(c)
+			if got != tc.want {
+				t.Errorf("want %s, but got %s", tc.want, got)
+			}
+		})
+	}
 }

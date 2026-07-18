@@ -42,6 +42,7 @@ const (
 	flagNode                = "node"
 	flagTimeout             = "timeout"
 	flagProtoDescriptorFile = "proto_descriptor_file"
+	flagMigrationTableName  = "migration-table-name"
 	defaultSchemaFileName   = "schema.sql"
 )
 

@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	migrationsDirName  = "migrations"
-	migrationTableName = "SchemaMigrations"
+	migrationsDirName         = "migrations"
+	defaultMigrationTableName = "SchemaMigrations"
 )
 
 // migrateCmd represents the migrate command
@@ -76,6 +76,7 @@ func init() {
 	)
 
 	migrateCmd.PersistentFlags().String(flagNameDirectory, "", "Directory that migration files placed (required)")
+	migrateCmd.PersistentFlags().String(flagMigrationTableName, defaultMigrationTableName, "Name of the migration tracking table")
 
 	migrateUpCmd.PersistentFlags().StringVar(&priority, flagPriority, "", "The priority to apply DML (optional)")
 }
@@ -141,7 +142,7 @@ func migrateUp(c *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
+	if err = client.EnsureMigrationTable(ctx, getMigrationTableName(c)); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
@@ -169,7 +170,7 @@ func migrateUp(c *cobra.Command, args []string) error {
 		}
 	}
 
-	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName, priorityType, protoDescriptor)
+	return client.ExecuteMigrations(ctx, migrations, limit, getMigrationTableName(c), priorityType, protoDescriptor)
 }
 
 func migrateVersion(c *cobra.Command, _ []string) error {
@@ -182,14 +183,14 @@ func migrateVersion(c *cobra.Command, _ []string) error {
 	}
 	defer client.Close()
 
-	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
+	if err = client.EnsureMigrationTable(ctx, getMigrationTableName(c)); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
 		}
 	}
 
-	v, _, err := client.GetSchemaMigrationVersion(ctx, migrationTableName)
+	v, _, err := client.GetSchemaMigrationVersion(ctx, getMigrationTableName(c))
 	if err != nil {
 		var se *spanner.Error
 		if errors.As(err, &se) && se.Code == spanner.ErrorCodeNoMigration {
@@ -205,6 +206,10 @@ func migrateVersion(c *cobra.Command, _ []string) error {
 	fmt.Println(v)
 
 	return nil
+}
+
+func getMigrationTableName(c *cobra.Command) string {
+	return c.Flag(flagMigrationTableName).Value.String()
 }
 
 func migrateSet(c *cobra.Command, args []string) error {
@@ -231,14 +236,14 @@ func migrateSet(c *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
+	if err = client.EnsureMigrationTable(ctx, getMigrationTableName(c)); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
 		}
 	}
 
-	if err := client.SetSchemaMigrationVersion(ctx, uint(version), false, migrationTableName); err != nil {
+	if err := client.SetSchemaMigrationVersion(ctx, uint(version), false, getMigrationTableName(c)); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
