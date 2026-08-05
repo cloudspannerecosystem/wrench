@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"cloud.google.com/go/spanner"
@@ -169,6 +170,13 @@ func TestTruncateAllTables(t *testing.T) {
 			migrationTableName:  customMigrationTable,
 			wantKeptTables:      []string{customMigrationTable},
 			wantTruncatedTables: []string{migrationTable},
+		},
+		// Cloud Spanner identifiers are case insensitive, so a name given in a
+		// different case still points at the same table.
+		"keep migration table given in a different case": {
+			migrationTableName:  strings.ToLower(migrationTable),
+			wantKeptTables:      []string{migrationTable},
+			wantTruncatedTables: []string{customMigrationTable},
 		},
 	}
 

@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"cloud.google.com/go/spanner"
 	databasev1 "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -157,7 +158,9 @@ func (c *Client) TruncateAllTables(ctx context.Context, migrationTableName strin
 			return err
 		}
 
-		if t.TableName == migrationTableName {
+		// Cloud Spanner identifiers are case insensitive, while INFORMATION_SCHEMA
+		// returns the name as it was declared.
+		if strings.EqualFold(t.TableName, migrationTableName) {
 			return nil
 		}
 
