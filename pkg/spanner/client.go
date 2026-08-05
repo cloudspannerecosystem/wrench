@@ -423,7 +423,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 
 func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string) (uint, bool, error) {
 	stmt := spanner.Statement{
-		SQL: `SELECT Version, Dirty FROM ` + tableName + ` LIMIT 1`,
+		SQL: fmt.Sprintf("SELECT Version, Dirty FROM `%s` LIMIT 1", tableName),
 	}
 	iter := c.spannerClient.Single().Query(ctx, stmt)
 	defer iter.Stop()
@@ -487,7 +487,7 @@ func (c *Client) EnsureMigrationTable(ctx context.Context, tableName string) err
 		return nil
 	}
 
-	stmt := fmt.Sprintf(`CREATE TABLE %s (
+	stmt := fmt.Sprintf("CREATE TABLE `%s` ("+`
     Version INT64 NOT NULL,
     Dirty    BOOL NOT NULL
 	) PRIMARY KEY(Version)`, tableName)

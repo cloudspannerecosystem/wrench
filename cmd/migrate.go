@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -37,6 +38,10 @@ const (
 	migrationsDirName         = "migrations"
 	defaultMigrationTableName = "SchemaMigrations"
 )
+
+// migrationTableNameRegex is the valid form of a Cloud Spanner table name.
+// The name is embedded into SQL/DDL statements, so it must be validated before use.
+var migrationTableNameRegex = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,127}$`)
 
 // migrateCmd represents the migrate command
 var migrateCmd = &cobra.Command{
@@ -136,13 +141,21 @@ func migrateUp(c *cobra.Command, args []string) error {
 		}
 	}
 
+	migrationTableName, err := getMigrationTableName(c)
+	if err != nil {
+		return &Error{
+			cmd: c,
+			err: err,
+		}
+	}
+
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	if err = client.EnsureMigrationTable(ctx, getMigrationTableName(c)); err != nil {
+	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
@@ -170,12 +183,20 @@ func migrateUp(c *cobra.Command, args []string) error {
 		}
 	}
 
-	return client.ExecuteMigrations(ctx, migrations, limit, getMigrationTableName(c), priorityType, protoDescriptor)
+	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName, priorityType, protoDescriptor)
 }
 
 func migrateVersion(c *cobra.Command, _ []string) error {
 	ctx, cancel := context.WithTimeout(c.Context(), timeout)
 	defer cancel()
+
+	migrationTableName, err := getMigrationTableName(c)
+	if err != nil {
+		return &Error{
+			cmd: c,
+			err: err,
+		}
+	}
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
@@ -183,14 +204,14 @@ func migrateVersion(c *cobra.Command, _ []string) error {
 	}
 	defer client.Close()
 
-	if err = client.EnsureMigrationTable(ctx, getMigrationTableName(c)); err != nil {
+	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
 		}
 	}
 
-	v, _, err := client.GetSchemaMigrationVersion(ctx, getMigrationTableName(c))
+	v, _, err := client.GetSchemaMigrationVersion(ctx, migrationTableName)
 	if err != nil {
 		var se *spanner.Error
 		if errors.As(err, &se) && se.Code == spanner.ErrorCodeNoMigration {
@@ -208,8 +229,17 @@ func migrateVersion(c *cobra.Command, _ []string) error {
 	return nil
 }
 
-func getMigrationTableName(c *cobra.Command) string {
-	return c.Flag(flagMigrationTableName).Value.String()
+func getMigrationTableName(c *cobra.Command) (string, error) {
+	name := c.Flag(flagMigrationTableName).Value.String()
+	if name == "" {
+		return defaultMigrationTableName, nil
+	}
+
+	if !migrationTableNameRegex.MatchString(name) {
+		return "", fmt.Errorf("Invalid migration table name: %q. It must start with a letter and contain only letters, numbers and underscores (up to 128 characters).", name)
+	}
+
+	return name, nil
 }
 
 func migrateSet(c *cobra.Command, args []string) error {
@@ -230,20 +260,28 @@ func migrateSet(c *cobra.Command, args []string) error {
 		}
 	}
 
-	client, err := newSpannerClient(ctx, c)
+	migrationTableName, err := getMigrationTableName(c)
 	if err != nil {
-		return err
-	}
-	defer client.Close()
-
-	if err = client.EnsureMigrationTable(ctx, getMigrationTableName(c)); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
 		}
 	}
 
-	if err := client.SetSchemaMigrationVersion(ctx, uint(version), false, getMigrationTableName(c)); err != nil {
+	client, err := newSpannerClient(ctx, c)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
+		return &Error{
+			cmd: c,
+			err: err,
+		}
+	}
+
+	if err := client.SetSchemaMigrationVersion(ctx, uint(version), false, migrationTableName); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
