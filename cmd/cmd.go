@@ -21,7 +21,9 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"regexp"
 
 	"github.com/spf13/cobra"
 
@@ -44,7 +46,13 @@ const (
 	flagProtoDescriptorFile = "proto_descriptor_file"
 	flagMigrationTableName  = "migration_table_name"
 	defaultSchemaFileName   = "schema.sql"
+
+	defaultMigrationTableName = "SchemaMigrations"
 )
+
+// migrationTableNameRegex is the valid form of a Cloud Spanner table name.
+// The name is embedded into SQL/DDL statements, so it must be validated before use.
+var migrationTableNameRegex = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,127}$`)
 
 func newSpannerClient(ctx context.Context, c *cobra.Command) (*spanner.Client, error) {
 	config := &spanner.Config{
@@ -90,6 +98,19 @@ func schemaFilePath(c *cobra.Command) string {
 		filename = defaultSchemaFileName
 	}
 	return filepath.Join(c.Flag(flagNameDirectory).Value.String(), filename)
+}
+
+func getMigrationTableName(c *cobra.Command) (string, error) {
+	name := c.Flag(flagMigrationTableName).Value.String()
+	if name == "" {
+		return defaultMigrationTableName, nil
+	}
+
+	if !migrationTableNameRegex.MatchString(name) {
+		return "", fmt.Errorf("Invalid migration table name: %q. It must start with a letter and contain only letters, numbers and underscores (up to 128 characters).", name)
+	}
+
+	return name, nil
 }
 
 func protoDescriptorFilePath(c *cobra.Command) string {

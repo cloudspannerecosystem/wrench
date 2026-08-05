@@ -31,9 +31,21 @@ var truncateCmd = &cobra.Command{
 	RunE:  truncate,
 }
 
+func init() {
+	truncateCmd.Flags().String(flagMigrationTableName, defaultMigrationTableName, "Name of the migration tracking table to be kept")
+}
+
 func truncate(c *cobra.Command, _ []string) error {
 	ctx, cancel := context.WithTimeout(c.Context(), timeout)
 	defer cancel()
+
+	migrationTableName, err := getMigrationTableName(c)
+	if err != nil {
+		return &Error{
+			err: err,
+			cmd: c,
+		}
+	}
 
 	client, err := newSpannerClient(ctx, c)
 	if err != nil {
@@ -41,7 +53,7 @@ func truncate(c *cobra.Command, _ []string) error {
 	}
 	defer client.Close()
 
-	err = client.TruncateAllTables(ctx)
+	err = client.TruncateAllTables(ctx, migrationTableName)
 	if err != nil {
 		return &Error{
 			err: err,

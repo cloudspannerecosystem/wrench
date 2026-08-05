@@ -32,8 +32,9 @@ import (
 )
 
 const (
-	singerTable    = "Singers"
-	migrationTable = "SchemaMigrations"
+	singerTable          = "Singers"
+	migrationTable       = "SchemaMigrations"
+	customMigrationTable = "DataMigrations"
 )
 
 type (
@@ -145,6 +146,95 @@ func TestApplyDDLFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTruncateAllTables(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	tests := map[string]struct {
+		// migrationTableName is the table to be kept.
+		migrationTableName string
+		// wantKeptTables are the tables that must still have their row.
+		wantKeptTables []string
+		// wantTruncatedTables are the tables that must be empty.
+		wantTruncatedTables []string
+	}{
+		"keep default migration table": {
+			migrationTableName:  migrationTable,
+			wantKeptTables:      []string{migrationTable},
+			wantTruncatedTables: []string{customMigrationTable},
+		},
+		"keep custom migration table": {
+			migrationTableName:  customMigrationTable,
+			wantKeptTables:      []string{customMigrationTable},
+			wantTruncatedTables: []string{migrationTable},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			client, done := testClientWithDatabase(t, ctx)
+			defer done()
+
+			if err := client.EnsureMigrationTable(ctx, customMigrationTable); err != nil {
+				t.Fatalf("failed to ensure migration table: %v", err)
+			}
+
+			_, err := client.spannerClient.Apply(
+				ctx,
+				[]*spanner.Mutation{
+					spanner.Insert(singerTable, []string{"SingerID", "FirstName"}, []interface{}{"1", "Foo"}),
+					spanner.Insert(migrationTable, []string{"Version", "Dirty"}, []interface{}{1, false}),
+					spanner.Insert(customMigrationTable, []string{"Version", "Dirty"}, []interface{}{1, false}),
+				},
+			)
+			if err != nil {
+				t.Fatalf("failed to apply mutation: %v", err)
+			}
+
+			if err := client.TruncateAllTables(ctx, test.migrationTableName); err != nil {
+				t.Fatalf("failed to truncate all tables: %v", err)
+			}
+
+			if got := countRows(t, ctx, client, singerTable); got != 0 {
+				t.Errorf("%s want 0 rows, but got %d", singerTable, got)
+			}
+
+			for _, table := range test.wantKeptTables {
+				if got := countRows(t, ctx, client, table); got != 1 {
+					t.Errorf("%s want 1 row, but got %d", table, got)
+				}
+			}
+
+			for _, table := range test.wantTruncatedTables {
+				if got := countRows(t, ctx, client, table); got != 0 {
+					t.Errorf("%s want 0 rows, but got %d", table, got)
+				}
+			}
+		})
+	}
+}
+
+func countRows(t *testing.T, ctx context.Context, client *Client, tableName string) int64 {
+	t.Helper()
+
+	ri := client.spannerClient.Single().Query(ctx, spanner.Statement{
+		SQL: fmt.Sprintf("SELECT COUNT(*) FROM `%s`", tableName),
+	})
+	defer ri.Stop()
+
+	row, err := ri.Next()
+	if err != nil {
+		t.Fatalf("failed to count rows of %s: %v", tableName, err)
+	}
+
+	var count int64
+	if err := row.Columns(&count); err != nil {
+		t.Fatalf("failed to read count of %s: %v", tableName, err)
+	}
+
+	return count
 }
 
 func TestApplyDMLFile(t *testing.T) {

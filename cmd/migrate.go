@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -35,13 +34,8 @@ import (
 )
 
 const (
-	migrationsDirName         = "migrations"
-	defaultMigrationTableName = "SchemaMigrations"
+	migrationsDirName = "migrations"
 )
-
-// migrationTableNameRegex is the valid form of a Cloud Spanner table name.
-// The name is embedded into SQL/DDL statements, so it must be validated before use.
-var migrationTableNameRegex = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,127}$`)
 
 // migrateCmd represents the migrate command
 var migrateCmd = &cobra.Command{
@@ -227,19 +221,6 @@ func migrateVersion(c *cobra.Command, _ []string) error {
 	fmt.Println(v)
 
 	return nil
-}
-
-func getMigrationTableName(c *cobra.Command) (string, error) {
-	name := c.Flag(flagMigrationTableName).Value.String()
-	if name == "" {
-		return defaultMigrationTableName, nil
-	}
-
-	if !migrationTableNameRegex.MatchString(name) {
-		return "", fmt.Errorf("Invalid migration table name: %q. It must start with a letter and contain only letters, numbers and underscores (up to 128 characters).", name)
-	}
-
-	return name, nil
 }
 
 func migrateSet(c *cobra.Command, args []string) error {

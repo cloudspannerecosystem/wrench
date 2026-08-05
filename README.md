@@ -118,7 +118,13 @@ $ wrench migrate up --directory ./_examples --migration_table_name DataMigration
 
 The table name must start with a letter and contain only letters, numbers and underscores.
 
-This is useful when you want to manage multiple migration systems in one database (e.g., schema migrations and data migrations separately). Note that the same `--migration_table_name` value must be given to `migrate up`, `migrate version` and `migrate set`, otherwise they operate on the default `SchemaMigrations` table.
+This is useful when you want to manage multiple migration systems in one database (e.g., schema migrations and data migrations separately). Note that the same `--migration_table_name` value must be given to `migrate up`, `migrate version`, `migrate set` and `truncate`, otherwise they operate on the default `SchemaMigrations` table.
+
+`truncate` keeps the migration table so that the database keeps its migration version. If you use a custom table name, pass it to `truncate` as well, otherwise the migration version is deleted:
+
+```sh
+$ wrench truncate --migration_table_name DataMigrations
+```
 
 ### Apply single DDL/DML
 

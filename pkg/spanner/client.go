@@ -143,7 +143,9 @@ func (c *Client) DropDatabase(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) TruncateAllTables(ctx context.Context) error {
+// TruncateAllTables deletes all rows of all tables except the migration table
+// named migrationTableName, so that the database keeps its migration version.
+func (c *Client) TruncateAllTables(ctx context.Context, migrationTableName string) error {
 	var stms []spanner.Statement
 
 	ri := c.spannerClient.Single().Query(ctx, spanner.Statement{
@@ -155,7 +157,7 @@ func (c *Client) TruncateAllTables(ctx context.Context) error {
 			return err
 		}
 
-		if t.TableName == "SchemaMigrations" {
+		if t.TableName == migrationTableName {
 			return nil
 		}
 
