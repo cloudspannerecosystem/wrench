@@ -125,8 +125,8 @@ func TestGetMigrationTableName(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &cobra.Command{}
-			c.Flags().String("migration-table-name", "SchemaMigrations", "")
-			if err := c.Flags().Set("migration-table-name", tc.flagValue); err != nil {
+			c.Flags().String("migration_table_name", "SchemaMigrations", "")
+			if err := c.Flags().Set("migration_table_name", tc.flagValue); err != nil {
 				t.Fatal(err)
 			}
 
