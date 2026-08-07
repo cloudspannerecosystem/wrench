@@ -23,6 +23,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cloudspannerecosystem/wrench/cmd"
@@ -78,10 +79,11 @@ func TestGetMigrationTableName(t *testing.T) {
 		name      string
 		flagValue string
 		want      string
+		wantErr   bool
 	}{
 		{
 			name:      "default value",
-			flagValue: "",
+			flagValue: "SchemaMigrations",
 			want:      "SchemaMigrations",
 		},
 		{
@@ -89,15 +91,55 @@ func TestGetMigrationTableName(t *testing.T) {
 			flagValue: "DataMigrations",
 			want:      "DataMigrations",
 		},
+		{
+			name:      "table name with underscore and digits",
+			flagValue: "Data_Migrations2",
+			want:      "Data_Migrations2",
+		},
+		{
+			name:      "empty value falls back to default",
+			flagValue: "",
+			want:      "SchemaMigrations",
+		},
+		{
+			name:      "table name starting with digit",
+			flagValue: "1Migrations",
+			wantErr:   true,
+		},
+		{
+			name:      "table name with invalid character",
+			flagValue: "Data-Migrations",
+			wantErr:   true,
+		},
+		{
+			name:      "table name with SQL injection",
+			flagValue: "SchemaMigrations` WHERE FALSE UNION ALL SELECT 1, FALSE FROM `SchemaMigrations",
+			wantErr:   true,
+		},
+		{
+			name:      "too long table name",
+			flagValue: strings.Repeat("A", 129),
+			wantErr:   true,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := &cobra.Command{}
-			c.Flags().String("migration-table-name", "SchemaMigrations", "")
-			if tc.flagValue != "" {
-				c.Flags().Set("migration-table-name", tc.flagValue)
+			c.Flags().String("migration_table_name", "SchemaMigrations", "")
+			if err := c.Flags().Set("migration_table_name", tc.flagValue); err != nil {
+				t.Fatal(err)
 			}
-			got := cmd.GetMigrationTableName(c)
+
+			got, err := cmd.GetMigrationTableName(c)
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("want error, but got nil (value: %s)", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("want no error, but got %v", err)
+			}
 			if got != tc.want {
 				t.Errorf("want %s, but got %s", tc.want, got)
 			}

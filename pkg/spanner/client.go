@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"cloud.google.com/go/spanner"
 	databasev1 "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -143,7 +144,9 @@ func (c *Client) DropDatabase(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) TruncateAllTables(ctx context.Context) error {
+// TruncateAllTables deletes all rows of all tables except the migration table
+// named migrationTableName, so that the database keeps its migration version.
+func (c *Client) TruncateAllTables(ctx context.Context, migrationTableName string) error {
 	var stms []spanner.Statement
 
 	ri := c.spannerClient.Single().Query(ctx, spanner.Statement{
@@ -155,7 +158,9 @@ func (c *Client) TruncateAllTables(ctx context.Context) error {
 			return err
 		}
 
-		if t.TableName == "SchemaMigrations" {
+		// Cloud Spanner identifiers are case insensitive, while INFORMATION_SCHEMA
+		// returns the name as it was declared.
+		if strings.EqualFold(t.TableName, migrationTableName) {
 			return nil
 		}
 
@@ -423,7 +428,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 
 func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string) (uint, bool, error) {
 	stmt := spanner.Statement{
-		SQL: `SELECT Version, Dirty FROM ` + tableName + ` LIMIT 1`,
+		SQL: fmt.Sprintf("SELECT Version, Dirty FROM `%s` LIMIT 1", tableName),
 	}
 	iter := c.spannerClient.Single().Query(ctx, stmt)
 	defer iter.Stop()
@@ -487,7 +492,7 @@ func (c *Client) EnsureMigrationTable(ctx context.Context, tableName string) err
 		return nil
 	}
 
-	stmt := fmt.Sprintf(`CREATE TABLE %s (
+	stmt := fmt.Sprintf("CREATE TABLE `%s` ("+`
     Version INT64 NOT NULL,
     Dirty    BOOL NOT NULL
 	) PRIMARY KEY(Version)`, tableName)
