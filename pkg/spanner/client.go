@@ -33,6 +33,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc/codes"
 )
 
 const (
@@ -490,6 +491,12 @@ func (c *Client) EnsureMigrationTable(ctx context.Context, tableName string) err
 	})
 	if err == nil {
 		return nil
+	}
+	if spanner.ErrCode(err) != codes.NotFound {
+		return &Error{
+			Code: ErrorCodeEnsureMigrationTable,
+			err:  err,
+		}
 	}
 
 	stmt := fmt.Sprintf("CREATE TABLE `%s` ("+`
