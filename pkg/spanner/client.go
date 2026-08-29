@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -33,6 +34,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -49,6 +52,20 @@ type Client struct {
 	spannerAdminClient *databasev1.DatabaseAdminClient
 }
 
+var emulatorHostScheme = regexp.MustCompile("^(http://|https://|passthrough:///)")
+
+// emulatorClientOptions returns the client options needed to connect to a
+// Cloud Spanner emulator at the given host, mirroring what the Cloud Spanner
+// client libraries do when SPANNER_EMULATOR_HOST is set.
+func emulatorClientOptions(emulatorHost string) []option.ClientOption {
+	schemeRemoved := emulatorHostScheme.ReplaceAllString(emulatorHost, "")
+	return []option.ClientOption{
+		option.WithEndpoint("passthrough:///" + schemeRemoved),
+		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		option.WithoutAuthentication(),
+	}
+}
+
 func NewClient(ctx context.Context, config *Config) (*Client, error) {
 	var opts []option.ClientOption
 
@@ -56,7 +73,11 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 	// Most options are last win so the options can be overridden by another option.
 	opts = append(opts, config.ClientOptions...)
 
-	if config.CredentialsFile != "" {
+	switch {
+	case config.EmulatorHost != "":
+		// The emulator takes no credentials, so CredentialsFile is ignored.
+		opts = append(opts, emulatorClientOptions(config.EmulatorHost)...)
+	case config.CredentialsFile != "":
 		opts = append(opts, option.WithCredentialsFile(config.CredentialsFile))
 	}
 

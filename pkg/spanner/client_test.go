@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -30,6 +31,7 @@ import (
 	sppb "cloud.google.com/go/spanner/apiv1/spannerpb"
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 const (
@@ -720,5 +722,100 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 		if err := client.DropDatabase(ctx); err != nil {
 			t.Fatalf("failed to delete database: %v", err)
 		}
+	}
+}
+
+func TestEmulatorClientOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		host         string
+		wantEndpoint string
+	}{
+		"plain host":         {host: "localhost:9010", wantEndpoint: "passthrough:///localhost:9010"},
+		"http scheme":        {host: "http://localhost:9010", wantEndpoint: "passthrough:///localhost:9010"},
+		"https scheme":       {host: "https://localhost:9010", wantEndpoint: "passthrough:///localhost:9010"},
+		"passthrough scheme": {host: "passthrough:///localhost:9010", wantEndpoint: "passthrough:///localhost:9010"},
+	}
+
+	for name, test := range tests {
+		test := test
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			opts := emulatorClientOptions(test.host)
+			if len(opts) != 3 {
+				t.Fatalf("emulatorClientOptions returned %d options, want 3", len(opts))
+			}
+			if got, want := opts[0], option.WithEndpoint(test.wantEndpoint); !reflect.DeepEqual(got, want) {
+				t.Errorf("endpoint option is %#v, want %#v", got, want)
+			}
+		})
+	}
+}
+
+func TestNewClientWithEmulatorHostConfig(t *testing.T) {
+	// No t.Parallel(): this test uses t.Setenv to make sure the connection
+	// comes from Config.EmulatorHost rather than the environment.
+	ctx := context.Background()
+
+	emulatorHost := os.Getenv(envSpannerEmulatorHost)
+	if emulatorHost == "" {
+		t.Fatal("test must use spanner emulator")
+	}
+
+	project := os.Getenv(envSpannerProjectID)
+	if project == "" {
+		t.Fatalf("must set %s", envSpannerProjectID)
+	}
+
+	instance := os.Getenv(envSpannerInstanceID)
+	if instance == "" {
+		t.Fatalf("must set %s", envSpannerInstanceID)
+	}
+
+	t.Setenv(envSpannerEmulatorHost, "")
+
+	id := uuid.New()
+	database := fmt.Sprintf("test-%s", id.String()[:18])
+
+	config := &Config{
+		Project:      project,
+		Instance:     instance,
+		Database:     database,
+		EmulatorHost: emulatorHost,
+	}
+
+	client, err := NewClient(ctx, config)
+	if err != nil {
+		t.Fatalf("failed to create spanner client: %v", err)
+	}
+
+	ddl, err := os.ReadFile("testdata/schema.sql")
+	if err != nil {
+		t.Fatalf("failed to read schema file: %v", err)
+	}
+
+	if err := client.CreateDatabase(ctx, "testdata/schema.sql", ddl, nil); err != nil {
+		t.Fatalf("failed to create database: %v", err)
+	}
+
+	// Spanner emulator is unstable when using a connection before creating a database.
+	// So recreate a wrench client for reconnecting the emulator.
+	client.Close()
+	client, err = NewClient(ctx, config)
+	if err != nil {
+		t.Fatalf("failed to create spanner client: %v", err)
+	}
+	defer func() {
+		defer client.Close()
+
+		if err := client.DropDatabase(ctx); err != nil {
+			t.Fatalf("failed to delete database: %v", err)
+		}
+	}()
+
+	if err := client.EnsureMigrationTable(ctx, migrationTable); err != nil {
+		t.Fatalf("failed to ensure migration table: %v", err)
 	}
 }
