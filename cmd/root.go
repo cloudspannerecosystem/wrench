@@ -44,6 +44,7 @@ var (
 	schemaFile      string
 	credentialsFile string
 	timeout         time.Duration
+	waitLongRunning bool
 )
 
 // CustomFileSystemFunc is a function that returns a custom fs.FS.
@@ -90,6 +91,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&schemaFile, flagNameSchemaFile, "", "Name of schema file (optional. if not set, will use default 'schema.sql' file name)")
 	rootCmd.PersistentFlags().StringVar(&credentialsFile, flagCredentialsFile, "", "Specify Credentials File")
 	rootCmd.PersistentFlags().DurationVar(&timeout, flagTimeout, time.Hour, "Context timeout")
+	rootCmd.PersistentFlags().BoolVar(&waitLongRunning, flagWaitLongRunning, false, "Wait for long-running DDL operations to complete regardless of --timeout (the timeout still applies to submitting each request)")
 
 	rootCmd.Version = versionInfo()
 	rootCmd.SetVersionTemplate(versionTemplate)

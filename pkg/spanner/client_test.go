@@ -96,12 +96,17 @@ func TestApplyDDLFile(t *testing.T) {
 
 	tests := map[string]struct {
 		protoDescriptors []byte
+		waitLongRunning  bool
 	}{
 		"without proto descriptors": {
 			protoDescriptors: nil,
 		},
 		"with empty proto descriptors": {
 			protoDescriptors: []byte{},
+		},
+		"with wait long running": {
+			protoDescriptors: nil,
+			waitLongRunning:  true,
 		},
 	}
 
@@ -114,6 +119,7 @@ func TestApplyDDLFile(t *testing.T) {
 
 			client, done := testClientWithDatabase(t, ctx)
 			defer done()
+			client.config.WaitLongRunning = test.waitLongRunning
 
 			if err := client.ApplyDDLFile(ctx, "testdata/ddl.sql", ddl, test.protoDescriptors); err != nil {
 				t.Fatalf("failed to apply ddl file: %v", err)
@@ -325,6 +331,7 @@ func TestExecuteMigrations(t *testing.T) {
 
 	tests := map[string]struct {
 		protoDescriptors []byte
+		waitLongRunning  bool
 	}{
 		"without proto descriptors": {
 			protoDescriptors: nil,
@@ -332,12 +339,17 @@ func TestExecuteMigrations(t *testing.T) {
 		"with empty proto descriptors": {
 			protoDescriptors: []byte{},
 		},
+		"with wait long running": {
+			protoDescriptors: nil,
+			waitLongRunning:  true,
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			client, done := testClientWithDatabase(t, ctx)
 			defer done()
+			client.config.WaitLongRunning = test.waitLongRunning
 
 			// to ensure partitioned-dml (000003.sql) will be applied correctly, insert a row before migration.
 			_, err := client.spannerClient.Apply(
