@@ -41,7 +41,9 @@ type Config struct {
 	// WaitLongRunning makes the client wait for long-running DDL operations to
 	// complete regardless of the deadline of the context passed to the method.
 	// The deadline still applies to submitting the request. Cancellation of the
-	// context (e.g. SIGINT) is still propagated while waiting.
+	// context (e.g. SIGINT) is still propagated while waiting. To propagate
+	// cancellation that happens after the deadline has been exceeded, derive the
+	// context from one returned by WithCancellationSource.
 	WaitLongRunning bool
 }
 
