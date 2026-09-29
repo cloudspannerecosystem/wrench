@@ -184,7 +184,7 @@ pull requests.
 1. Start spanner emulator.
 
 ```
-$ docker run --rm -it -p 9010:9010 -p 9020:9020 gcr.io/cloud-spanner-emulator/emulator:1.5.0
+$ docker run --rm -it -p 9010:9010 -p 9020:9020 gcr.io/cloud-spanner-emulator/emulator:1.5.58
 ```
 
 2. Initialize a spanner instance.
