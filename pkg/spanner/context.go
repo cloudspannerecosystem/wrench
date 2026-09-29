@@ -24,23 +24,48 @@ import (
 	"errors"
 )
 
+type cancellationSourceKey struct{}
+
+// WithCancellationSource returns a copy of ctx that records ctx as the source
+// of explicit cancellation (e.g. a context canceled by SIGINT/SIGTERM).
+//
+// When Config.WaitLongRunning is enabled, waiting for a long-running operation
+// is not bounded by the deadline of the context passed to the method. However,
+// once a context derived with context.WithTimeout exceeds its deadline, a later
+// cancellation of its parent can no longer be observed through it. Recording
+// the source here lets the wait still be canceled in that case.
+func WithCancellationSource(ctx context.Context) context.Context {
+	return context.WithValue(ctx, cancellationSourceKey{}, ctx)
+}
+
 // withoutDeadline returns a context that inherits values and explicit
 // cancellation from parent but not its deadline. The returned context is
-// canceled when parent is canceled with context.Canceled (e.g. by a signal),
+// canceled when parent, or the cancellation source recorded by
+// WithCancellationSource, is canceled with context.Canceled (e.g. by a signal),
 // but it is not canceled when parent exceeds its deadline.
 //
 // The returned CancelFunc must be called to release resources.
 func withoutDeadline(parent context.Context) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.WithoutCancel(parent))
 
-	stop := context.AfterFunc(parent, func() {
-		if errors.Is(parent.Err(), context.Canceled) {
+	stops := []func() bool{cancelOnCanceled(parent, cancel)}
+	if src, ok := parent.Value(cancellationSourceKey{}).(context.Context); ok {
+		stops = append(stops, cancelOnCanceled(src, cancel))
+	}
+
+	return ctx, func() {
+		for _, stop := range stops {
+			stop()
+		}
+		cancel()
+	}
+}
+
+// cancelOnCanceled calls cancel when src is canceled with context.Canceled.
+func cancelOnCanceled(src context.Context, cancel context.CancelFunc) func() bool {
+	return context.AfterFunc(src, func() {
+		if errors.Is(src.Err(), context.Canceled) {
 			cancel()
 		}
 	})
-
-	return ctx, func() {
-		stop()
-		cancel()
-	}
 }

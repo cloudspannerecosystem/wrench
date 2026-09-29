@@ -253,6 +253,14 @@ func (c *Client) ApplyDDL(ctx context.Context, statements []string, protoDescrip
 
 	err = op.Wait(waitCtx)
 	if err != nil {
+		if c.config.WaitLongRunning && errors.Is(waitCtx.Err(), context.Canceled) {
+			// Canceling the wait does not cancel the operation itself.
+			err = &waitCanceledError{
+				operation: op.Name(),
+				config:    c.config,
+				err:       err,
+			}
+		}
 		return &Error{
 			Code: ErrorCodeWaitOperation,
 			err:  err,
@@ -260,6 +268,35 @@ func (c *Client) ApplyDDL(ctx context.Context, statements []string, protoDescrip
 	}
 
 	return nil
+}
+
+// waitCanceledError reports that waiting for a long-running operation was
+// canceled while the operation itself keeps running on Cloud Spanner.
+type waitCanceledError struct {
+	operation string
+	config    *Config
+	err       error
+}
+
+func (e *waitCanceledError) Error() string {
+	id := e.operation[strings.LastIndex(e.operation, "/")+1:]
+	flags := fmt.Sprintf("--project=%s --instance=%s --database=%s", e.config.Project, e.config.Instance, e.config.Database)
+	return fmt.Sprintf("stopped waiting for long-running operation %s, but the operation is still running on Cloud Spanner. "+
+		"Check it with `gcloud spanner operations describe %s %s`, or cancel it with `gcloud spanner operations cancel %s %s`: %v",
+		e.operation, id, flags, id, flags, e.err)
+}
+
+func (e *waitCanceledError) Unwrap() error {
+	return e.err
+}
+
+func isWaitCanceled(err error) bool {
+	var se *Error
+	if errors.As(err, &se) {
+		err = se.err
+	}
+	var wce *waitCanceledError
+	return errors.As(err, &wce)
 }
 
 type PriorityType int
@@ -383,6 +420,9 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 		switch m.kind {
 		case statementKindDDL:
 			if err := c.ApplyDDL(ctx, m.Statements, protoDescriptors); err != nil {
+				if isWaitCanceled(err) {
+					err = fmt.Errorf("%w. Version %d is left dirty; after the operation finishes, check the schema and fix the version with `wrench migrate set`", err, m.Version)
+				}
 				return &Error{
 					Code: ErrorCodeExecuteMigrations,
 					err:  err,

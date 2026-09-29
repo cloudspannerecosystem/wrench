@@ -22,8 +22,12 @@ package spanner
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type ctxKey struct{}
@@ -99,4 +103,78 @@ func TestWithoutDeadline(t *testing.T) {
 			t.Fatal("ctx must be canceled when root is canceled")
 		}
 	})
+
+	t.Run("inherits cancellation of the source after the deadline is exceeded", func(t *testing.T) {
+		t.Parallel()
+
+		root, cancelRoot := context.WithCancel(context.Background())
+		parent, cancel := context.WithTimeout(WithCancellationSource(root), 10*time.Millisecond)
+		defer cancel()
+
+		ctx, stop := withoutDeadline(parent)
+		defer stop()
+
+		<-parent.Done()
+		if !errors.Is(parent.Err(), context.DeadlineExceeded) {
+			t.Fatalf("parent err: %v", parent.Err())
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("ctx must not be canceled by parent deadline: %v", ctx.Err())
+		case <-time.After(50 * time.Millisecond):
+		}
+
+		cancelRoot()
+
+		select {
+		case <-ctx.Done():
+			if !errors.Is(ctx.Err(), context.Canceled) {
+				t.Fatalf("ctx err: %v", ctx.Err())
+			}
+		case <-time.After(time.Second):
+			t.Fatal("ctx must be canceled when the source is canceled after the deadline")
+		}
+	})
+}
+
+func TestWaitCanceledError(t *testing.T) {
+	t.Parallel()
+
+	config := &Config{Project: "p", Instance: "i", Database: "d"}
+
+	for name, cause := range map[string]error{
+		"context error": context.Canceled,
+		"grpc status":   status.Error(codes.Canceled, "context canceled"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			err := &Error{
+				Code: ErrorCodeWaitOperation,
+				err: &waitCanceledError{
+					operation: "projects/p/instances/i/databases/d/operations/op1",
+					config:    config,
+					err:       cause,
+				},
+			}
+
+			if !isWaitCanceled(err) {
+				t.Fatal("isWaitCanceled must be true")
+			}
+			if isWaitCanceled(&Error{Code: ErrorCodeWaitOperation, err: cause}) {
+				t.Fatal("isWaitCanceled must be false for other errors")
+			}
+
+			msg := err.Error()
+			for _, want := range []string{
+				"projects/p/instances/i/databases/d/operations/op1",
+				"gcloud spanner operations describe op1 --project=p --instance=i --database=d",
+				"gcloud spanner operations cancel op1 --project=p --instance=i --database=d",
+			} {
+				if !strings.Contains(msg, want) {
+					t.Errorf("error message must contain %q, got %q", want, msg)
+				}
+			}
+		})
+	}
 }

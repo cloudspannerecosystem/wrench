@@ -27,6 +27,7 @@ import (
 	"time"
 
 	wrenchfs "github.com/cloudspannerecosystem/wrench/internal/fs"
+	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 	"github.com/spf13/cobra"
 )
 
@@ -66,7 +67,9 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute(ctx context.Context) error {
-	return rootCmd.ExecuteContext(ctx)
+	// Record ctx so that waiting with --wait-long-running-operation can still be
+	// canceled (e.g. by SIGINT) after --timeout has been exceeded.
+	return rootCmd.ExecuteContext(spanner.WithCancellationSource(ctx))
 }
 
 func init() {
