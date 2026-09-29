@@ -20,36 +20,27 @@
 package spanner
 
 import (
-	"fmt"
-
-	"google.golang.org/api/option"
+	"context"
+	"errors"
 )
 
-type Config struct {
-	Project         string
-	Instance        string
-	Database        string
-	CredentialsFile string
+// withoutDeadline returns a context that inherits values and explicit
+// cancellation from parent but not its deadline. The returned context is
+// canceled when parent is canceled with context.Canceled (e.g. by a signal),
+// but it is not canceled when parent exceeds its deadline.
+//
+// The returned CancelFunc must be called to release resources.
+func withoutDeadline(parent context.Context) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.WithoutCancel(parent))
 
-	// ClientOptions is options of Spanner clients when creating the clients for both normal
-	// and admin. This options are evaluated first and can be overridden by other
-	// configurations in Wrench.
-	//
-	// Experimental: There will be a breaking change in the future versions.
-	ClientOptions []option.ClientOption
+	stop := context.AfterFunc(parent, func() {
+		if errors.Is(parent.Err(), context.Canceled) {
+			cancel()
+		}
+	})
 
-	// WaitLongRunning makes the client wait for long-running DDL operations to
-	// complete regardless of the deadline of the context passed to the method.
-	// The deadline still applies to submitting the request. Cancellation of the
-	// context (e.g. SIGINT) is still propagated while waiting.
-	WaitLongRunning bool
-}
-
-func (c *Config) URL() string {
-	return fmt.Sprintf(
-		"projects/%s/instances/%s/databases/%s",
-		c.Project,
-		c.Instance,
-		c.Database,
-	)
+	return ctx, func() {
+		stop()
+		cancel()
+	}
 }

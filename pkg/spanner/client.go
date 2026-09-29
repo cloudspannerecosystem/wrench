@@ -243,7 +243,15 @@ func (c *Client) ApplyDDL(ctx context.Context, statements []string, protoDescrip
 		}
 	}
 
-	err = op.Wait(ctx)
+	waitCtx := ctx
+	if c.config.WaitLongRunning {
+		var cancel context.CancelFunc
+		waitCtx, cancel = withoutDeadline(ctx)
+		defer cancel()
+		fmt.Printf("waiting for long-running operation %s\n", op.Name())
+	}
+
+	err = op.Wait(waitCtx)
 	if err != nil {
 		return &Error{
 			Code: ErrorCodeWaitOperation,
@@ -407,7 +415,17 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 			fmt.Printf("%d/up\n", m.Version)
 		}
 
-		if err := c.SetSchemaMigrationVersion(ctx, m.Version, false, tableName); err != nil {
+		// When waiting for a long-running DDL operation is not bounded by the
+		// deadline, the deadline may already be exceeded here. Record the version
+		// without the deadline as well so that the version is not left dirty
+		// after the DDL has actually been applied.
+		markCtx := ctx
+		if c.config.WaitLongRunning && m.kind == statementKindDDL {
+			var cancel context.CancelFunc
+			markCtx, cancel = withoutDeadline(ctx)
+			defer cancel()
+		}
+		if err := c.SetSchemaMigrationVersion(markCtx, m.Version, false, tableName); err != nil {
 			return &Error{
 				Code: ErrorCodeExecuteMigrations,
 				err:  err,

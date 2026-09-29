@@ -134,6 +134,21 @@ $ wrench apply --ddl ./_examples/ddl.sql
 
 This applies single DDL or DML.
 
+### Wait for long-running DDL operations
+
+```sh
+$ wrench migrate up --directory ./_examples --wait-long-running-operation
+```
+
+By default, the whole command must finish within `--timeout` (1 hour by default).
+DDL such as adding an index on a large table can take longer than that, and when the timeout is exceeded while waiting,
+the DDL keeps running on Cloud Spanner but `SchemaMigrations` is left dirty.
+
+With `--wait-long-running-operation`, `--timeout` still applies to submitting each request, but wrench polls the long-running
+operation until it completes without a deadline (Ctrl-C still stops waiting), and then records the migration version.
+The operation name is printed so that it can be inspected with `gcloud spanner operations describe` as well.
+This flag is also effective for `wrench apply --ddl`.
+
 Use `wrench [command] --help` for more information about a command.
 
 ### Embed migrations file to 1 binary

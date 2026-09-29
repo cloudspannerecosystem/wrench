@@ -43,6 +43,7 @@ const (
 	flagPriority            = "priority"
 	flagNode                = "node"
 	flagTimeout             = "timeout"
+	flagWaitLongRunning     = "wait-long-running-operation"
 	flagProtoDescriptorFile = "proto_descriptor_file"
 	flagMigrationTableName  = "migration_table_name"
 	defaultSchemaFileName   = "schema.sql"
@@ -60,6 +61,7 @@ func newSpannerClient(ctx context.Context, c *cobra.Command) (*spanner.Client, e
 		Instance:        c.Flag(flagNameInstance).Value.String(),
 		Database:        c.Flag(flagNameDatabase).Value.String(),
 		CredentialsFile: c.Flag(flagCredentialsFile).Value.String(),
+		WaitLongRunning: waitLongRunning,
 	}
 
 	client, err := spanner.NewClient(ctx, config)
