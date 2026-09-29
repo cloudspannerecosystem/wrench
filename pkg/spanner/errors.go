@@ -41,6 +41,7 @@ const (
 	ErrorCodeWaitOperation
 	ErrorCodeCreateInstance
 	ErrorCodeDeleteInstance
+	ErrorCodeEnsureMigrationTable
 )
 
 type Error struct {
