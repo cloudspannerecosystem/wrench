@@ -4,6 +4,8 @@ on:
       - master
   pull_request:
 name: build and test
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
