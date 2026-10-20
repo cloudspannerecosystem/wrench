@@ -5,7 +5,7 @@ go 1.25.9
 require (
 	cloud.google.com/go/spanner v1.95.1
 	github.com/apstndb/gsqlutils v0.0.0-20260813143423-9e5dff7c7357
-	github.com/cloudspannerecosystem/memefish v0.8.1
+	github.com/cloudspannerecosystem/memefish v0.9.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/spf13/cobra v1.10.2
