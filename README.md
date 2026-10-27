@@ -207,23 +207,28 @@ pull requests.
 
 ### How to run tests locally
 
-1. Start spanner emulator.
-
-```
-$ docker run --rm -it -p 9010:9010 -p 9020:9020 gcr.io/cloud-spanner-emulator/emulator:1.5.58
-```
-
-2. Initialize a spanner instance.
-
-```
-$ make setup-emulator
-```
-
-3. Run tests
+Run the test suite with:
 
 ```
 $ make test
 ```
+
+When `SPANNER_EMULATOR_HOST` is unset, the tests reuse an emulator at
+`localhost:9010` if one is running. Otherwise, they start the Spanner emulator
+with Docker, or Podman if Docker cannot start it. The container uses dynamically
+assigned host ports, and the test harness creates the test instance and stops
+the container when the test process exits.
+
+When `SPANNER_EMULATOR_HOST` is set, the tests use that address. They fail if no
+emulator is reachable there and do not start a container. A locally running
+emulator on `localhost:9010` also gets its test instance created automatically.
+
+The `make test` target disables Go's test result cache so the emulator setup and
+tests run on every invocation. Docker or Podman is required only when the tests
+need to start a local emulator.
+
+To use an emulator at another address, set `SPANNER_EMULATOR_HOST` and initialize
+its test instance before running `make test`.
 
 ## License
 
