@@ -70,6 +70,7 @@ func (c *Config) URL() string {
 	)
 }
 
+// databaseDialect maps the zero value to GoogleSQL so existing Config literals keep their behavior.
 func (c *Config) databaseDialect() databasepb.DatabaseDialect {
 	if c.Dialect == databasepb.DatabaseDialect_DATABASE_DIALECT_UNSPECIFIED {
 		return databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL

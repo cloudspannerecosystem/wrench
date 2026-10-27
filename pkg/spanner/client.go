@@ -136,6 +136,8 @@ func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte
 		DatabaseDialect:  dialect,
 		ProtoDescriptors: protoDescriptors,
 	}
+	// PostgreSQL database creation does not support ExtraStatements; GoogleSQL runs
+	// the DDL atomically with database creation through this request field.
 	if dialect != databasepb.DatabaseDialect_POSTGRESQL {
 		createReq.ExtraStatements = statements
 	}
@@ -155,6 +157,8 @@ func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte
 			err:  err,
 		}
 	}
+	// PostgreSQL cannot run DDL in the create request, so submit it after the
+	// database has finished creating.
 	if dialect == databasepb.DatabaseDialect_POSTGRESQL && len(statements) > 0 {
 		if err := c.ApplyDDL(ctx, statements, protoDescriptors); err != nil {
 			return err
@@ -183,6 +187,8 @@ func (c *Client) TruncateAllTables(ctx context.Context, migrationTableName strin
 	var stms []spanner.Statement
 
 	query := "SELECT table_name FROM information_schema.tables WHERE table_catalog = '' AND table_schema = ''"
+	// PostgreSQL exposes user tables in public and marks base tables explicitly;
+	// GoogleSQL uses empty catalog and schema names in INFORMATION_SCHEMA.
 	if c.config.databaseDialect() == databasepb.DatabaseDialect_POSTGRESQL {
 		query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
 	}
@@ -600,6 +606,8 @@ func (c *Client) EnsureMigrationTable(ctx context.Context, tableName string) err
     Version INT64 NOT NULL,
     Dirty    BOOL NOT NULL
 	) PRIMARY KEY(Version)`, tableName)
+	// PostgreSQL uses its type names and a table-level key declaration; GoogleSQL
+	// uses INT64/BOOL and places PRIMARY KEY after the column definitions.
 	if c.config.databaseDialect() == databasepb.DatabaseDialect_POSTGRESQL {
 		createTable = fmt.Sprintf("CREATE TABLE %s ("+`
     "Version" bigint NOT NULL,

@@ -118,6 +118,8 @@ func ReadMigrationsWithDialect(ctx context.Context, dir string, dialect database
 
 		statements, err := ddlToStatementsWithDialect(f.Name(), file, dialect)
 		if err != nil {
+			// Numbered migration files may contain DDL or DML, so retry as DML when
+			// the DDL parser rejects the file.
 			nstatements, nerr := dmlToStatementsWithDialect(f.Name(), file, dialect)
 			if nerr != nil {
 				return nil, fmt.Errorf("failed to parse DDL/DML statements: %v, %v", err, nerr)

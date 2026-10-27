@@ -228,6 +228,7 @@ func testPostgreSQLClientWithSchema(t *testing.T, schema string) *Client {
 	t.Cleanup(func() {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer cancel()
+		// Database creation can fail before a database exists, so only drop it after success.
 		if created {
 			if err := client.DropDatabase(cleanupCtx); err != nil {
 				t.Errorf("failed to drop test database: %v", err)
