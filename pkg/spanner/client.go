@@ -79,7 +79,16 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 		// The emulator takes no credentials, so CredentialsFile is ignored.
 		opts = append(opts, emulatorClientOptions(config.EmulatorHost)...)
 	case config.CredentialsFile != "":
-		opts = append(opts, option.WithCredentialsFile(config.CredentialsFile))
+		credentialsOption, err := credentialsClientOption(config)
+		if err != nil {
+			return nil, &Error{
+				Code: ErrorCodeCreateClient,
+				err:  fmt.Errorf("invalid credentials configuration: %w", err),
+			}
+		}
+		if credentialsOption != nil {
+			opts = append(opts, credentialsOption)
+		}
 	}
 
 	// Wrench previously passed SessionPoolConfig to NewClientWithConfig. The Spanner client

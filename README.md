@@ -60,6 +60,32 @@ export SPANNER_DATABASE_ID=your-database-id
 
 You can also specify project id, instance id and database id by passing them as command arguments.
 
+### Credentials
+
+Wrench uses Application Default Credentials when `--credentials_file` is omitted. To use a JSON
+credentials file, pass `--credentials_file`. The `--credentials_type` flag tells Wrench which JSON
+format to expect and defaults to `service_account`.
+
+Use the default for a service account key:
+
+```sh
+$ wrench --credentials_file=/path/to/service-account.json create --directory ./_examples
+```
+
+Use `authorized_user` for a user credentials file that contains a refresh token:
+
+```sh
+$ wrench --credentials_file=/path/to/user-credentials.json --credentials_type=authorized_user create --directory ./_examples
+```
+
+Wrench accepts `service_account` and `authorized_user`. It returns an error for other credential
+types. When `--credentials_file` is omitted, `--credentials_type` has no effect and Wrench uses
+Application Default Credentials.
+
+Choosing a credential type does not validate a credentials file from an untrusted source. Follow
+Google's [credential configuration validation guidance](https://cloud.google.com/docs/authentication/external/externally-sourced-credentials)
+before using externally supplied credential files.
+
 ### Create database
 
 ```sh

@@ -16,8 +16,15 @@ type AdminClient struct {
 
 func NewAdminClient(ctx context.Context, config *Config) (*AdminClient, error) {
 	opts := make([]option.ClientOption, 0)
-	if config.CredentialsFile != "" {
-		opts = append(opts, option.WithCredentialsFile(config.CredentialsFile))
+	credentialsOption, err := credentialsClientOption(config)
+	if err != nil {
+		return nil, &Error{
+			Code: ErrorCodeCreateClient,
+			err:  fmt.Errorf("invalid credentials configuration: %w", err),
+		}
+	}
+	if credentialsOption != nil {
+		opts = append(opts, credentialsOption)
 	}
 
 	instanceAdminClient, err := instancev1.NewInstanceAdminClient(ctx, opts...)
