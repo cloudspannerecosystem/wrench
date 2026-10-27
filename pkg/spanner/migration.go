@@ -158,12 +158,17 @@ func inspectStatementsKind(statements []string) (statementKind, error) {
 		return statementKindDDL, nil
 	}
 
+	classifications, err := classifyStatements(statements)
+	if err != nil {
+		return "", err
+	}
+
 	var hasDDL, hasDML, hasPartitionedDML bool
-	for _, s := range statements {
-		switch {
-		case isDML(s):
+	for _, classification := range classifications {
+		switch classification {
+		case migrationDMLTypeInsert:
 			hasDML = true
-		case isPartitionedDML(s):
+		case migrationDMLTypeUpdate, migrationDMLTypeDelete:
 			hasPartitionedDML = true
 		default:
 			hasDDL = true

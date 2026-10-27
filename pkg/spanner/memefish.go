@@ -1,12 +1,32 @@
 package spanner
 
 import (
+	"fmt"
+	"strings"
+
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/apstndb/gsqlutils"
 	"github.com/cloudspannerecosystem/memefish"
+	sqlparser "github.com/googleapis/go-sql-spanner/parser"
 )
 
-// Directly use of memefish/gsqlutils is permitted only in this file.
+// Parser integrations are kept here so migration code depends only on local types.
 func toStatements(filename string, data []byte) ([]string, error) {
+	parser, err := newStatementParser()
+	if err != nil {
+		return nil, err
+	}
+
+	multiple, statements, err := parser.Split(string(data))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", filename, err)
+	}
+	if multiple {
+		return statements, nil
+	}
+
+	// Split returns no statements when the input contains only one statement.
+	// Keep Memefish for that case so it removes the terminator and validates input.
 	rawStmts, err := memefish.SplitRawStatements(filename, string(data))
 	if err != nil {
 		return nil, err
@@ -14,24 +34,47 @@ func toStatements(filename string, data []byte) ([]string, error) {
 
 	var result []string
 	for _, rawStmt := range rawStmts {
-		result = append(result, rawStmt.Statement)
+		stripped, err := gsqlutils.SimpleStripComments("", rawStmt.Statement)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(stripped) != "" {
+			result = append(result, rawStmt.Statement)
+		}
 	}
 	return result, nil
 }
 
-func isDML(statement string) bool {
-	token, err := gsqlutils.FirstNonHintToken("", statement)
-	if err != nil {
-		return false
-	}
-	return token.IsKeywordLike("INSERT")
+func newStatementParser() (*sqlparser.StatementParser, error) {
+	return sqlparser.NewStatementParser(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, 0)
 }
 
-func isPartitionedDML(statement string) bool {
-	// It is better than regular expression because PDML can be prefixed by statement hints.
-	token, err := gsqlutils.FirstNonHintToken("", statement)
+type migrationDMLType uint8
+
+const (
+	migrationDMLTypeOther migrationDMLType = iota
+	migrationDMLTypeInsert
+	migrationDMLTypeUpdate
+	migrationDMLTypeDelete
+)
+
+func classifyStatements(statements []string) ([]migrationDMLType, error) {
+	parser, err := newStatementParser()
 	if err != nil {
-		return false
+		return nil, err
 	}
-	return token.IsKeywordLike("UPDATE") || token.IsKeywordLike("DELETE")
+
+	classifications := make([]migrationDMLType, len(statements))
+	for i, statement := range statements {
+		info := parser.DetectStatementType(statement)
+		switch info.DmlType {
+		case sqlparser.DmlTypeInsert:
+			classifications[i] = migrationDMLTypeInsert
+		case sqlparser.DmlTypeUpdate:
+			classifications[i] = migrationDMLTypeUpdate
+		case sqlparser.DmlTypeDelete:
+			classifications[i] = migrationDMLTypeDelete
+		}
+	}
+	return classifications, nil
 }
