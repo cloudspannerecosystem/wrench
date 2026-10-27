@@ -72,6 +72,9 @@ func TestPostgreSQLMigrationWorkflow(t *testing.T) {
 	if err := client.EnsureMigrationTable(ctx, migrationTable); err != nil {
 		t.Fatalf("failed to create PostgreSQL migration table: %v", err)
 	}
+	if err := client.EnsureMigrationTable(ctx, migrationTable); err != nil {
+		t.Fatalf("failed to reuse PostgreSQL migration table: %v", err)
+	}
 	if err := client.SetSchemaMigrationVersion(ctx, 0, true, migrationTable); err != nil {
 		t.Fatalf("failed to set PostgreSQL migration version: %v", err)
 	}
@@ -101,6 +104,19 @@ func TestPostgreSQLMigrationWorkflow(t *testing.T) {
 	migrations, err := ReadMigrationsWithDialect(ctx, migrationDir, databasepb.DatabaseDialect_POSTGRESQL)
 	if err != nil {
 		t.Fatalf("failed to read PostgreSQL migrations: %v", err)
+	}
+	if len(migrations) != 3 {
+		t.Fatalf("want three PostgreSQL migrations, got %d", len(migrations))
+	}
+	if err := client.ExecuteMigrations(ctx, migrations, 1, migrationTable, PriorityTypeUnspecified, nil); err != nil {
+		t.Fatalf("failed to execute first PostgreSQL migration: %v", err)
+	}
+	version, dirty, err = client.GetSchemaMigrationVersion(ctx, migrationTable)
+	if err != nil {
+		t.Fatalf("failed to read version after first PostgreSQL migration: %v", err)
+	}
+	if version != 1 || dirty {
+		t.Fatalf("want migration version 1 clean, got version %d dirty %t", version, dirty)
 	}
 	if err := client.ExecuteMigrations(ctx, migrations, len(migrations), migrationTable, PriorityTypeUnspecified, nil); err != nil {
 		t.Fatalf("failed to execute PostgreSQL migrations: %v", err)
