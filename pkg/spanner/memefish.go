@@ -10,11 +10,6 @@ import (
 	sqlparser "github.com/googleapis/go-sql-spanner/parser"
 )
 
-// Parser integrations are kept here so migration code depends only on local types.
-func toStatements(filename string, data []byte) ([]string, error) {
-	return toStatementsWithDialect(filename, data, databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
-}
-
 func toStatementsWithDialect(filename string, data []byte, dialect databasepb.DatabaseDialect) ([]string, error) {
 	parser, err := newStatementParser(dialect)
 	if err != nil {

@@ -151,24 +151,12 @@ func LoadMigrations(dir string) (Migrations, error) {
 	return ReadMigrations(context.Background(), dir)
 }
 
-func ddlToStatements(filename string, data []byte) ([]string, error) {
-	return toStatements(filename, data)
-}
-
 func ddlToStatementsWithDialect(filename string, data []byte, dialect databasepb.DatabaseDialect) ([]string, error) {
 	return toStatementsWithDialect(filename, data, dialect)
 }
 
-func dmlToStatements(filename string, data []byte) ([]string, error) {
-	return toStatements(filename, data)
-}
-
 func dmlToStatementsWithDialect(filename string, data []byte, dialect databasepb.DatabaseDialect) ([]string, error) {
 	return toStatementsWithDialect(filename, data, dialect)
-}
-
-func inspectStatementsKind(statements []string) (statementKind, error) {
-	return inspectStatementsKindWithDialect(statements, databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
 }
 
 func inspectStatementsKindWithDialect(statements []string, dialect databasepb.DatabaseDialect) (statementKind, error) {
