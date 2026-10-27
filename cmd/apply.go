@@ -49,7 +49,11 @@ func apply(c *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			c.PrintErrf("failed to close Spanner client: %v\n", err)
+		}
+	}()
 
 	if ddlFile != "" {
 		if dmlFile != "" {
@@ -88,7 +92,7 @@ func apply(c *cobra.Command, _ []string) error {
 	}
 
 	if dmlFile == "" {
-		return errors.New("Must specify DDL or DML.")
+		return errors.New("must specify DDL or DML")
 	}
 
 	// apply dml

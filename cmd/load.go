@@ -40,7 +40,11 @@ func load(c *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			c.PrintErrf("failed to close Spanner client: %v\n", err)
+		}
+	}()
 
 	ddl, protoDescriptors, err := client.LoadDDL(ctx)
 	if err != nil {

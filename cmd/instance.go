@@ -27,7 +27,11 @@ func instanceCreate(c *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			c.PrintErrf("failed to close Spanner client: %v\n", err)
+		}
+	}()
 
 	err = client.CreateInstance(ctx, node)
 	if err != nil {
@@ -55,7 +59,11 @@ func instanceDelete(c *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			c.PrintErrf("failed to close Spanner client: %v\n", err)
+		}
+	}()
 
 	err = client.DeleteInstance(ctx, instance)
 	if err != nil {

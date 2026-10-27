@@ -68,7 +68,7 @@ func TestCreateMigrationFile(t *testing.T) {
 
 	t.Run("invalid name", func(t *testing.T) {
 		_, err := cmd.CreateMigrationFile(context.Background(), testdatadir, "あああ", 6)
-		if err.Error() != "Invalid migration file name." {
+		if err.Error() != "invalid migration file name" {
 			t.Errorf("err want `invalid name`, but got `%v`", err)
 		}
 	})

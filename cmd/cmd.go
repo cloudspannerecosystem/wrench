@@ -114,7 +114,7 @@ func getMigrationTableName(c *cobra.Command) (string, error) {
 	}
 
 	if !migrationTableNameRegex.MatchString(name) {
-		return "", fmt.Errorf("Invalid migration table name: %q. It must start with a letter and contain only letters, numbers and underscores (up to 128 characters).", name)
+		return "", fmt.Errorf("invalid migration table name %q; it must start with a letter and contain only letters, numbers and underscores (up to 128 characters)", name)
 	}
 
 	return name, nil
