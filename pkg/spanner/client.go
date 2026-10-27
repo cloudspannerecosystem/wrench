@@ -120,7 +120,8 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 }
 
 func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte, protoDescriptors []byte) error {
-	statements, err := ddlToStatements(filename, ddl)
+	dialect := c.config.databaseDialect()
+	statements, err := ddlToStatementsWithDialect(filename, ddl, dialect)
 	if err != nil {
 		return &Error{
 			Code: ErrorCodeLoadSchema,
@@ -128,11 +129,15 @@ func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte
 		}
 	}
 
+	createStatement := fmt.Sprintf("CREATE DATABASE %s", quoteIdentifier(c.config.Database, dialect))
 	createReq := &databasepb.CreateDatabaseRequest{
 		Parent:           fmt.Sprintf("projects/%s/instances/%s", c.config.Project, c.config.Instance),
-		CreateStatement:  fmt.Sprintf("CREATE DATABASE `%s`", c.config.Database),
-		ExtraStatements:  statements,
+		CreateStatement:  createStatement,
+		DatabaseDialect:  dialect,
 		ProtoDescriptors: protoDescriptors,
+	}
+	if dialect != databasepb.DatabaseDialect_POSTGRESQL {
+		createReq.ExtraStatements = statements
 	}
 
 	op, err := c.spannerAdminClient.CreateDatabase(ctx, createReq)
@@ -148,6 +153,11 @@ func (c *Client) CreateDatabase(ctx context.Context, filename string, ddl []byte
 		return &Error{
 			Code: ErrorCodeWaitOperation,
 			err:  err,
+		}
+	}
+	if dialect == databasepb.DatabaseDialect_POSTGRESQL && len(statements) > 0 {
+		if err := c.ApplyDDL(ctx, statements, protoDescriptors); err != nil {
+			return err
 		}
 	}
 
@@ -172,8 +182,12 @@ func (c *Client) DropDatabase(ctx context.Context) error {
 func (c *Client) TruncateAllTables(ctx context.Context, migrationTableName string) error {
 	var stms []spanner.Statement
 
+	query := "SELECT table_name FROM information_schema.tables WHERE table_catalog = '' AND table_schema = ''"
+	if c.config.databaseDialect() == databasepb.DatabaseDialect_POSTGRESQL {
+		query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+	}
 	ri := c.spannerClient.Single().Query(ctx, spanner.Statement{
-		SQL: "SELECT table_name FROM information_schema.tables WHERE table_catalog = '' AND table_schema = ''",
+		SQL: query,
 	})
 	err := ri.Do(func(row *spanner.Row) error {
 		t := &table{}
@@ -187,7 +201,7 @@ func (c *Client) TruncateAllTables(ctx context.Context, migrationTableName strin
 			return nil
 		}
 
-		stms = append(stms, spanner.NewStatement(fmt.Sprintf("DELETE FROM `%s` WHERE true", t.TableName)))
+		stms = append(stms, spanner.NewStatement(fmt.Sprintf("DELETE FROM %s WHERE true", quoteIdentifier(t.TableName, c.config.databaseDialect()))))
 		return nil
 	})
 	if err != nil {
@@ -242,7 +256,7 @@ func (c *Client) LoadDDL(ctx context.Context) ([]byte, []byte, error) {
 }
 
 func (c *Client) ApplyDDLFile(ctx context.Context, filename string, ddl []byte, protoDescriptors []byte) error {
-	statements, err := ddlToStatements(filename, ddl)
+	statements, err := ddlToStatementsWithDialect(filename, ddl, c.config.databaseDialect())
 	if err != nil {
 		return err
 	}
@@ -331,7 +345,7 @@ const (
 )
 
 func (c *Client) ApplyDMLFile(ctx context.Context, filename string, ddl []byte, partitioned bool, priority PriorityType) (int64, error) {
-	statements, err := dmlToStatements(filename, ddl)
+	statements, err := dmlToStatementsWithDialect(filename, ddl, c.config.databaseDialect())
 	if err != nil {
 		return 0, err
 	}
@@ -509,7 +523,10 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 
 func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string) (uint, bool, error) {
 	stmt := spanner.Statement{
-		SQL: fmt.Sprintf("SELECT Version, Dirty FROM `%s` LIMIT 1", tableName),
+		SQL: fmt.Sprintf("SELECT %s, %s FROM %s LIMIT 1",
+			quoteIdentifier("Version", c.config.databaseDialect()),
+			quoteIdentifier("Dirty", c.config.databaseDialect()),
+			quoteIdentifier(tableName, c.config.databaseDialect())),
 	}
 	iter := c.spannerClient.Single().Query(ctx, stmt)
 	defer iter.Stop()
@@ -579,12 +596,19 @@ func (c *Client) EnsureMigrationTable(ctx context.Context, tableName string) err
 		}
 	}
 
-	stmt := fmt.Sprintf("CREATE TABLE `%s` ("+`
+	createTable := fmt.Sprintf("CREATE TABLE %s ("+`
     Version INT64 NOT NULL,
     Dirty    BOOL NOT NULL
 	) PRIMARY KEY(Version)`, tableName)
+	if c.config.databaseDialect() == databasepb.DatabaseDialect_POSTGRESQL {
+		createTable = fmt.Sprintf("CREATE TABLE %s ("+`
+    "Version" bigint NOT NULL,
+    "Dirty" boolean NOT NULL,
+    PRIMARY KEY ("Version")
+	)`, quoteIdentifier(tableName, c.config.databaseDialect()))
+	}
 
-	return c.ApplyDDL(ctx, []string{stmt}, nil)
+	return c.ApplyDDL(ctx, []string{createTable}, nil)
 }
 
 func (c *Client) Close() error {

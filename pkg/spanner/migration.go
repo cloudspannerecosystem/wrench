@@ -27,6 +27,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"github.com/cloudspannerecosystem/wrench/internal/fs"
 )
 
@@ -79,6 +80,11 @@ func (ms Migrations) Less(i, j int) bool {
 }
 
 func ReadMigrations(ctx context.Context, dir string) (Migrations, error) {
+	return ReadMigrationsWithDialect(ctx, dir, databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
+}
+
+// ReadMigrationsWithDialect reads numbered migrations using the specified SQL dialect.
+func ReadMigrationsWithDialect(ctx context.Context, dir string, dialect databasepb.DatabaseDialect) (Migrations, error) {
 	files, err := fs.ReadDir(ctx, dir)
 	if err != nil {
 		return nil, err
@@ -110,16 +116,16 @@ func ReadMigrations(ctx context.Context, dir string) (Migrations, error) {
 			continue
 		}
 
-		statements, err := ddlToStatements(f.Name(), file)
+		statements, err := ddlToStatementsWithDialect(f.Name(), file, dialect)
 		if err != nil {
-			nstatements, nerr := dmlToStatements(f.Name(), file)
+			nstatements, nerr := dmlToStatementsWithDialect(f.Name(), file, dialect)
 			if nerr != nil {
 				return nil, fmt.Errorf("failed to parse DDL/DML statements: %v, %v", err, nerr)
 			}
 			statements = nstatements
 		}
 
-		kind, err := inspectStatementsKind(statements)
+		kind, err := inspectStatementsKindWithDialect(statements, dialect)
 		if err != nil {
 			return nil, err
 		}
@@ -149,16 +155,28 @@ func ddlToStatements(filename string, data []byte) ([]string, error) {
 	return toStatements(filename, data)
 }
 
+func ddlToStatementsWithDialect(filename string, data []byte, dialect databasepb.DatabaseDialect) ([]string, error) {
+	return toStatementsWithDialect(filename, data, dialect)
+}
+
 func dmlToStatements(filename string, data []byte) ([]string, error) {
 	return toStatements(filename, data)
 }
 
+func dmlToStatementsWithDialect(filename string, data []byte, dialect databasepb.DatabaseDialect) ([]string, error) {
+	return toStatementsWithDialect(filename, data, dialect)
+}
+
 func inspectStatementsKind(statements []string) (statementKind, error) {
+	return inspectStatementsKindWithDialect(statements, databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
+}
+
+func inspectStatementsKindWithDialect(statements []string, dialect databasepb.DatabaseDialect) (statementKind, error) {
 	if len(statements) == 0 { // Treat empty files as DDL.
 		return statementKindDDL, nil
 	}
 
-	classifications, err := classifyStatements(statements)
+	classifications, err := classifyStatements(statements, dialect)
 	if err != nil {
 		return "", err
 	}

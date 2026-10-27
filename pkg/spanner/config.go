@@ -22,13 +22,16 @@ package spanner
 import (
 	"fmt"
 
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	"google.golang.org/api/option"
 )
 
 type Config struct {
-	Project         string
-	Instance        string
-	Database        string
+	Project  string
+	Instance string
+	Database string
+	// Dialect selects the SQL dialect for the database. Unspecified uses GoogleSQL.
+	Dialect         databasepb.DatabaseDialect
 	CredentialsFile string
 	// CredentialsType identifies the JSON format in CredentialsFile. Empty uses
 	// option.ServiceAccount. Wrench accepts service_account and authorized_user.
@@ -65,4 +68,11 @@ func (c *Config) URL() string {
 		c.Instance,
 		c.Database,
 	)
+}
+
+func (c *Config) databaseDialect() databasepb.DatabaseDialect {
+	if c.Dialect == databasepb.DatabaseDialect_DATABASE_DIALECT_UNSPECIFIED {
+		return databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL
+	}
+	return c.Dialect
 }

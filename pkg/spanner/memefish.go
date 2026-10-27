@@ -12,7 +12,11 @@ import (
 
 // Parser integrations are kept here so migration code depends only on local types.
 func toStatements(filename string, data []byte) ([]string, error) {
-	parser, err := newStatementParser()
+	return toStatementsWithDialect(filename, data, databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL)
+}
+
+func toStatementsWithDialect(filename string, data []byte, dialect databasepb.DatabaseDialect) ([]string, error) {
+	parser, err := newStatementParser(dialect)
 	if err != nil {
 		return nil, err
 	}
@@ -23,6 +27,18 @@ func toStatements(filename string, data []byte) ([]string, error) {
 	}
 	if multiple {
 		return statements, nil
+	}
+	if dialect == databasepb.DatabaseDialect_POSTGRESQL {
+		statement := strings.TrimSpace(string(data))
+		statement = strings.TrimSuffix(statement, ";")
+		stripped, err := gsqlutils.SimpleStripComments("", statement)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(stripped) == "" {
+			return nil, nil
+		}
+		return []string{strings.TrimSpace(statement)}, nil
 	}
 
 	// Split returns no statements when the input contains only one statement.
@@ -45,8 +61,8 @@ func toStatements(filename string, data []byte) ([]string, error) {
 	return result, nil
 }
 
-func newStatementParser() (*sqlparser.StatementParser, error) {
-	return sqlparser.NewStatementParser(databasepb.DatabaseDialect_GOOGLE_STANDARD_SQL, 0)
+func newStatementParser(dialect databasepb.DatabaseDialect) (*sqlparser.StatementParser, error) {
+	return sqlparser.NewStatementParser(dialect, 0)
 }
 
 type migrationDMLType uint8
@@ -58,8 +74,8 @@ const (
 	migrationDMLTypeDelete
 )
 
-func classifyStatements(statements []string) ([]migrationDMLType, error) {
-	parser, err := newStatementParser()
+func classifyStatements(statements []string, dialect databasepb.DatabaseDialect) ([]migrationDMLType, error) {
+	parser, err := newStatementParser(dialect)
 	if err != nil {
 		return nil, err
 	}
