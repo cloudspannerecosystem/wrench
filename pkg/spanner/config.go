@@ -31,6 +31,14 @@ type Config struct {
 	Database        string
 	CredentialsFile string
 
+	// EmulatorHost is the host and port of a Cloud Spanner emulator to connect
+	// to (e.g. "localhost:9010"). When set, wrench connects to the emulator
+	// with authentication disabled, exactly as if SPANNER_EMULATOR_HOST were
+	// set, and CredentialsFile is ignored. This is useful when wrench is used
+	// as a library and setting a process-wide environment variable is not an
+	// option.
+	EmulatorHost string
+
 	// ClientOptions is options of Spanner clients when creating the clients for both normal
 	// and admin. This options are evaluated first and can be overridden by other
 	// configurations in Wrench.
