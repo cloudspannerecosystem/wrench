@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
 	"sort"
 	"strings"
@@ -32,7 +33,6 @@ import (
 	databasepb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	sppb "cloud.google.com/go/spanner/apiv1/spannerpb"
 	"github.com/hashicorp/go-multierror"
-	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -402,24 +402,49 @@ func (c *Client) ApplyPartitionedDML(ctx context.Context, statements []string, p
 }
 
 func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, limit int, tableName string, priorityType PriorityType, protoDescriptors []byte) error {
+	return c.executeMigrations(ctx, migrations, limit, nil, tableName, priorityType, protoDescriptors)
+}
+
+// ExecuteMigrationVersion applies one pending migration and records its version.
+func (c *Client) ExecuteMigrationVersion(ctx context.Context, migrations Migrations, version uint, tableName string, priorityType PriorityType, protoDescriptors []byte) error {
+	return c.executeMigrations(ctx, migrations, 1, &version, tableName, priorityType, protoDescriptors)
+}
+
+func (c *Client) executeMigrations(ctx context.Context, migrations Migrations, limit int, only *uint, tableName string, priorityType PriorityType, protoDescriptors []byte) error {
 	sort.Sort(migrations)
 
-	version, dirty, err := c.GetSchemaMigrationVersion(ctx, tableName)
+	history, err := c.readMigrationHistory(ctx, tableName)
 	if err != nil {
-		var se *Error
-		if !errors.As(err, &se) || se.Code != ErrorCodeNoMigration {
-			return &Error{
-				Code: ErrorCodeExecuteMigrations,
-				err:  err,
-			}
-		}
+		return &Error{Code: ErrorCodeExecuteMigrations, err: err}
 	}
 
-	if dirty {
+	if history.dirty != nil {
 		return &Error{
 			Code: ErrorCodeMigrationVersionDirty,
-			err:  fmt.Errorf("database version: %d is dirty, please fix it", version),
+			err:  fmt.Errorf("database version: %d is dirty, please fix it", *history.dirty),
 		}
+	}
+	var selected *Migration
+	if only != nil {
+		applied := make(map[uint]struct{}, len(history.applied))
+		for version := range history.applied {
+			applied[version] = struct{}{}
+		}
+		if history.legacy && len(history.applied) > 0 {
+			for _, version := range legacyBackfill(migrations, history.current, history.applied) {
+				applied[version] = struct{}{}
+			}
+		}
+		selected, err = pendingMigration(migrations, *only, applied)
+		if err != nil {
+			return &Error{Code: ErrorCodeExecuteMigrations, err: err}
+		}
+	}
+	if err := c.initializeMigrationHistory(ctx, tableName, migrations, &history); err != nil {
+		return &Error{Code: ErrorCodeExecuteMigrations, err: err}
+	}
+	if selected != nil {
+		migrations = Migrations{selected}
 	}
 
 	var count int
@@ -428,7 +453,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 			break
 		}
 
-		if m.Version <= version {
+		if _, applied := history.applied[m.Version]; applied {
 			continue
 		}
 
@@ -494,6 +519,7 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 			}
 		}
 
+		history.applied[m.Version] = struct{}{}
 		count++
 		if limit > 0 && count == limit {
 			break
@@ -507,46 +533,40 @@ func (c *Client) ExecuteMigrations(ctx context.Context, migrations Migrations, l
 	return nil
 }
 
-func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string) (uint, bool, error) {
-	stmt := spanner.Statement{
-		SQL: fmt.Sprintf("SELECT Version, Dirty FROM `%s` LIMIT 1", tableName),
-	}
-	iter := c.spannerClient.Single().Query(ctx, stmt)
-	defer iter.Stop()
-
-	row, err := iter.Next()
-	if err != nil {
-		if errors.Is(err, iterator.Done) {
-			return 0, false, &Error{
-				Code: ErrorCodeNoMigration,
-				err:  errors.New("no migration"),
-			}
+func pendingMigration(migrations Migrations, target uint, applied map[uint]struct{}) (*Migration, error) {
+	for _, migration := range migrations {
+		if migration.Version != target {
+			continue
 		}
-		return 0, false, &Error{
-			Code: ErrorCodeGetMigrationVersion,
-			err:  err,
+		if _, exists := applied[target]; exists {
+			return nil, fmt.Errorf("migration version %d is already applied", target)
 		}
+		return migration, nil
 	}
-
-	var (
-		v     int64
-		dirty bool
-	)
-	if err := row.Columns(&v, &dirty); err != nil {
-		return 0, false, &Error{
-			Code: ErrorCodeGetMigrationVersion,
-			err:  err,
-		}
-	}
-
-	return uint(v), dirty, nil
+	return nil, fmt.Errorf("migration version %d was not found", target)
 }
 
+// GetSchemaMigrationVersion returns the highest recorded version and whether any version is dirty.
+func (c *Client) GetSchemaMigrationVersion(ctx context.Context, tableName string) (uint, bool, error) {
+	history, err := c.readMigrationHistory(ctx, tableName)
+	if err != nil {
+		return 0, false, &Error{Code: ErrorCodeGetMigrationVersion, err: err}
+	}
+	if len(history.applied) == 0 {
+		return 0, false, &Error{Code: ErrorCodeNoMigration, err: errors.New("no migration")}
+	}
+	return history.current, history.dirty != nil, nil
+}
+
+// SetSchemaMigrationVersion writes one version row without removing other applied versions.
 func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, dirty bool, tableName string) error {
+	if version > math.MaxInt64 {
+		return &Error{Code: ErrorCodeSetMigrationVersion, err: fmt.Errorf("migration version %d exceeds Spanner INT64 range", version)}
+	}
 	_, err := c.spannerClient.ReadWriteTransaction(ctx, func(_ context.Context, tx *spanner.ReadWriteTransaction) error {
 		m := []*spanner.Mutation{
-			spanner.Delete(tableName, spanner.AllKeys()),
-			spanner.Insert(
+			spanner.InsertOrUpdate(tableName, []string{"Version", "Dirty"}, []interface{}{migrationHistoryMarker, false}),
+			spanner.InsertOrUpdate(
 				tableName,
 				[]string{"Version", "Dirty"},
 				[]interface{}{int64(version), dirty},
@@ -561,6 +581,51 @@ func (c *Client) SetSchemaMigrationVersion(ctx context.Context, version uint, di
 		}
 	}
 
+	return nil
+}
+
+// ResetMigrationHistory marks the supplied version and all available earlier migrations as applied.
+func (c *Client) ResetMigrationHistory(ctx context.Context, migrations Migrations, version uint, tableName string) error {
+	if version > math.MaxInt64 {
+		return &Error{Code: ErrorCodeSetMigrationVersion, err: fmt.Errorf("migration version %d exceeds Spanner INT64 range", version)}
+	}
+	mutations := []*spanner.Mutation{
+		spanner.Delete(tableName, spanner.AllKeys()),
+		spanner.Insert(tableName, []string{"Version", "Dirty"}, []interface{}{migrationHistoryMarker, false}),
+	}
+	versions := map[uint]struct{}{version: {}}
+	for _, migration := range migrations {
+		if migration.Version <= version {
+			versions[migration.Version] = struct{}{}
+		}
+	}
+	for applied := range versions {
+		mutations = append(mutations, spanner.Insert(tableName, []string{"Version", "Dirty"},
+			[]interface{}{int64(applied), false}))
+	}
+	_, err := c.spannerClient.ReadWriteTransaction(ctx, func(_ context.Context, tx *spanner.ReadWriteTransaction) error {
+		return tx.BufferWrite(mutations)
+	})
+	if err != nil {
+		return &Error{Code: ErrorCodeSetMigrationVersion, err: err}
+	}
+	return nil
+}
+
+// SetMigrationBaseline records a legacy version until migration files are available for backfill.
+func (c *Client) SetMigrationBaseline(ctx context.Context, version uint, tableName string) error {
+	if version > math.MaxInt64 {
+		return &Error{Code: ErrorCodeSetMigrationVersion, err: fmt.Errorf("migration version %d exceeds Spanner INT64 range", version)}
+	}
+	_, err := c.spannerClient.ReadWriteTransaction(ctx, func(_ context.Context, tx *spanner.ReadWriteTransaction) error {
+		return tx.BufferWrite([]*spanner.Mutation{
+			spanner.Delete(tableName, spanner.AllKeys()),
+			spanner.Insert(tableName, []string{"Version", "Dirty"}, []interface{}{int64(version), false}),
+		})
+	})
+	if err != nil {
+		return &Error{Code: ErrorCodeSetMigrationVersion, err: err}
+	}
 	return nil
 }
 

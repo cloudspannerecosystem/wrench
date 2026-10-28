@@ -32,6 +32,7 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc/codes"
 )
 
 const (
@@ -508,6 +509,115 @@ func TestSetSchemaMigrationVersion(t *testing.T) {
 	}
 
 	ensureMigrationVersionRecord(t, ctx, client, int64(nextVersion), nextDirty)
+	ensureMigrationVersionRecord(t, ctx, client, int64(version), dirty)
+	ensureMigrationVersionRecord(t, ctx, client, migrationHistoryMarker, false)
+}
+
+func TestExecuteMigrationVersionKeepsEarlierMigrationsPending(t *testing.T) {
+	ctx := t.Context()
+	client, done := testClientWithDatabase(t, ctx)
+	defer done()
+
+	migrations, err := ReadMigrations(ctx, "testdata/migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ExecuteMigrations(ctx, migrations, 1, migrationTable, PriorityTypeUnspecified, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ExecuteMigrationVersion(ctx, migrations, 99, migrationTable, PriorityTypeUnspecified, nil); err == nil || !strings.Contains(err.Error(), "migration version 99 was not found") {
+		t.Fatalf("expected missing version error, got %v", err)
+	}
+	if err := client.ExecuteMigrationVersion(ctx, migrations, 2, migrationTable, PriorityTypeUnspecified, nil); err == nil || !strings.Contains(err.Error(), "migration version 2 is already applied") {
+		t.Fatalf("expected already applied version error, got %v", err)
+	}
+	if err := client.ExecuteMigrationVersion(ctx, migrations, 5, migrationTable, PriorityTypeUnspecified, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ExecuteMigrationVersion(ctx, migrations, 5, migrationTable, PriorityTypeUnspecified, nil); err == nil || !strings.Contains(err.Error(), "already applied") {
+		t.Fatalf("expected already-applied error, got %v", err)
+	}
+	ensureMigrationVersionRecord(t, ctx, client, 2, false)
+	ensureMigrationVersionRecord(t, ctx, client, 5, false)
+	version, dirty, err := client.GetSchemaMigrationVersion(ctx, migrationTable)
+	if err != nil || version != 5 || dirty {
+		t.Fatalf("got version=%d dirty=%t err=%v, want version 5 clean", version, dirty, err)
+	}
+
+	if err := client.ExecuteMigrations(ctx, migrations, 1, migrationTable, PriorityTypeUnspecified, nil); err != nil {
+		t.Fatal(err)
+	}
+	ensureMigrationVersionRecord(t, ctx, client, 3, false)
+	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "YES")
+
+	if err := client.ExecuteMigrations(ctx, migrations, 1, migrationTable, PriorityTypeUnspecified, nil); err != nil {
+		t.Fatal(err)
+	}
+	ensureMigrationVersionRecord(t, ctx, client, 4, false)
+	ensureMigrationColumn(t, ctx, client, "LastName", "STRING(MAX)", "NO")
+}
+
+func TestResetMigrationHistory(t *testing.T) {
+	ctx := t.Context()
+	client, done := testClientWithDatabase(t, ctx)
+	defer done()
+
+	migrations, err := ReadMigrations(ctx, "testdata/migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ResetMigrationHistory(ctx, migrations, 5, migrationTable); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ResetMigrationHistory(ctx, migrations, 3, migrationTable); err != nil {
+		t.Fatal(err)
+	}
+	ensureMigrationVersionRecord(t, ctx, client, migrationHistoryMarker, false)
+	ensureMigrationVersionRecord(t, ctx, client, 2, false)
+	ensureMigrationVersionRecord(t, ctx, client, 3, false)
+	_, err = client.spannerClient.Single().ReadRow(ctx, migrationTable, spanner.Key{int64(5)}, []string{"Version"})
+	if spanner.ErrCode(err) != codes.NotFound {
+		t.Fatalf("version 5 should be pending after set 3, got %v", err)
+	}
+	version, dirty, err := client.GetSchemaMigrationVersion(ctx, migrationTable)
+	if err != nil || version != 3 || dirty {
+		t.Fatalf("got version=%d dirty=%t err=%v, want version 3 clean", version, dirty, err)
+	}
+	if err := client.SetMigrationBaseline(ctx, 2, migrationTable); err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.spannerClient.Single().ReadRow(ctx, migrationTable, spanner.Key{migrationHistoryMarker}, []string{"Version"})
+	if spanner.ErrCode(err) != codes.NotFound {
+		t.Fatalf("baseline should omit history marker, got %v", err)
+	}
+	ensureMigrationVersionRecord(t, ctx, client, 2, false)
+}
+
+func TestLegacyMigrationHistoryBackfill(t *testing.T) {
+	ctx := t.Context()
+	client, done := testClientWithDatabase(t, ctx)
+	defer done()
+
+	_, err := client.spannerClient.Apply(ctx, []*spanner.Mutation{
+		spanner.Insert(migrationTable, []string{"Version", "Dirty"}, []interface{}{int64(3), false}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	migrations, err := ReadMigrations(ctx, "testdata/migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ExecuteMigrations(ctx, migrations, 0, migrationTable, PriorityTypeUnspecified, nil); err != nil {
+		t.Fatal(err)
+	}
+	ensureMigrationVersionRecord(t, ctx, client, migrationHistoryMarker, false)
+	ensureMigrationVersionRecord(t, ctx, client, 2, false)
+	ensureMigrationVersionRecord(t, ctx, client, 3, false)
+	_, err = client.spannerClient.Single().ReadRow(ctx, migrationTable, spanner.Key{int64(4)}, []string{"Version"})
+	if spanner.ErrCode(err) != codes.NotFound {
+		t.Fatalf("version 4 should remain pending, got %v", err)
+	}
 }
 
 func TestEnsureMigrationTable(t *testing.T) {

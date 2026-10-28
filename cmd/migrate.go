@@ -56,7 +56,7 @@ func init() {
 	}
 	migrateVersionCmd := &cobra.Command{
 		Use:   "version",
-		Short: "Print current migration version",
+		Short: "Print highest recorded migration version",
 		RunE:  migrateVersion,
 	}
 	migrateSetCmd := &cobra.Command{
@@ -66,6 +66,7 @@ func init() {
 	}
 
 	migrateUpCmd.Flags().String(flagProtoDescriptorFile, "", "Proto descriptor file to be used with migrations")
+	migrateUpCmd.Flags().String("only", "", "Apply only the pending migration with this version")
 
 	migrateCmd.AddCommand(
 		migrateCreateCmd,
@@ -115,16 +116,9 @@ func migrateUp(c *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(c.Context(), timeout)
 	defer cancel()
 
-	limit := -1
-	if len(args) > 0 {
-		n, err := strconv.Atoi(args[0])
-		if err != nil {
-			return &Error{
-				cmd: c,
-				err: err,
-			}
-		}
-		limit = n
+	limit, only, onlySet, err := migrateUpSelection(c, args)
+	if err != nil {
+		return &Error{cmd: c, err: err}
 	}
 
 	priorityType, err := priorityTypeOf(priority)
@@ -181,7 +175,40 @@ func migrateUp(c *cobra.Command, args []string) error {
 		}
 	}
 
+	if onlySet {
+		return client.ExecuteMigrationVersion(ctx, migrations, only, migrationTableName, priorityType, protoDescriptor)
+	}
 	return client.ExecuteMigrations(ctx, migrations, limit, migrationTableName, priorityType, protoDescriptor)
+}
+
+func migrateUpSelection(c *cobra.Command, args []string) (int, uint, bool, error) {
+	if c.Flags().Changed("only") {
+		if len(args) > 0 {
+			return 0, 0, false, errors.New("--only cannot be used with a migration count")
+		}
+		value, err := c.Flags().GetString("only")
+		if err != nil {
+			return 0, 0, false, err
+		}
+		version, err := strconv.ParseUint(value, 10, 63)
+		if err != nil {
+			return 0, 0, false, fmt.Errorf("invalid migration version %q: must be a nonnegative Spanner INT64", value)
+		}
+		if version > uint64(^uint(0)) {
+			return 0, 0, false, fmt.Errorf("migration version %q exceeds supported range", value)
+		}
+		return -1, uint(version), true, nil
+	}
+
+	limit := -1
+	if len(args) > 0 {
+		n, err := strconv.Atoi(args[0])
+		if err != nil {
+			return 0, 0, false, err
+		}
+		limit = n
+	}
+	return limit, 0, false, nil
 }
 
 func migrateVersion(c *cobra.Command, _ []string) error {
@@ -241,12 +268,15 @@ func migrateSet(c *cobra.Command, args []string) error {
 			err: errors.New("parameters are not passed"),
 		}
 	}
-	version, err := strconv.Atoi(args[0])
+	version, err := strconv.ParseUint(args[0], 10, 63)
 	if err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
 		}
+	}
+	if version > uint64(^uint(0)) {
+		return &Error{cmd: c, err: fmt.Errorf("migration version %d exceeds supported range", version)}
 	}
 
 	migrationTableName, err := getMigrationTableName(c)
@@ -274,7 +304,19 @@ func migrateSet(c *cobra.Command, args []string) error {
 		}
 	}
 
-	if err := client.SetSchemaMigrationVersion(ctx, uint(version), false, migrationTableName); err != nil {
+	if c.Flag(flagNameDirectory).Value.String() == "" {
+		if err := client.SetMigrationBaseline(ctx, uint(version), migrationTableName); err != nil {
+			return &Error{cmd: c, err: err}
+		}
+		return nil
+	}
+
+	dir := filepath.Join(c.Flag(flagNameDirectory).Value.String(), migrationsDirName)
+	migrations, err := spanner.ReadMigrations(ctx, dir)
+	if err != nil {
+		return &Error{cmd: c, err: err}
+	}
+	if err := client.ResetMigrationHistory(ctx, migrations, uint(version), migrationTableName); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,

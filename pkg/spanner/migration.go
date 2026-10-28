@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -103,6 +104,9 @@ func ReadMigrations(ctx context.Context, dir string) (Migrations, error) {
 		version, err := strconv.ParseUint(matches[1], 10, 64)
 		if err != nil {
 			continue
+		}
+		if version > math.MaxInt64 || version > uint64(^uint(0)) {
+			return nil, fmt.Errorf("migration version %d exceeds supported range", version)
 		}
 
 		file, err := fs.ReadFile(ctx, filepath.Join(dir, filename))

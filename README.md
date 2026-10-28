@@ -134,6 +134,40 @@ $ wrench migrate up --directory ./_examples
 
 This executes migrations. This also creates `SchemaMigrations` table into your database to manage schema version if it does not exist.
 
+Use `wrench migrate up 2 --directory ./_examples` to apply the next two pending migrations.
+
+#### Apply one chosen migration
+
+`--only N` applies just the migration whose numeric version is N. This is useful for a production hotfix when other
+migrations are pending but are not ready for production. For example, production may have version 1 applied, while
+versions 2 and 3 contain unfinished feature work and version 4 contains an urgent fix. Apply version 4 by itself:
+
+```sh
+wrench migrate up --only 4 --directory ./_examples
+```
+
+Wrench records version 4 as applied and leaves versions 2 and 3 pending. After those migrations are ready, a normal
+`migrate up` applies versions 2 and 3 in numeric order, skipping version 4. This lets teams release the hotfix first,
+then merge its migration into development without treating every lower version as already applied.
+
+The selected migration file must exist in the configured migrations directory and must not already be applied. Wrench
+returns an error if the version is missing or already applied. `--only` cannot be combined with the positional migration
+count. Wrench does not check whether the selected migration depends on another pending migration, so use this option
+only when that migration can run against the database's current schema.
+
+The `SchemaMigrations` table definition does not change. Wrench stores one row for each applied version and a reserved
+`Version = -1` row to mark the per-migration history format. Migration filenames cannot have negative versions. On the
+first `migrate up`, Wrench converts an existing clean single-version row by marking the available migration files at or
+below that version as applied. A lower-version file added after this conversion remains pending and can be applied later.
+`migrate version` prints the highest applied version; lower versions may still be pending.
+
+Use a wrench version with per-migration history for every later migration run after enabling `--only`. Older versions
+expect one row in `SchemaMigrations` and cannot safely read or update per-migration history.
+
+`migrate set V --directory ./_examples` replaces the history with V and all available migration files up to V.
+Without `--directory`, `migrate set V` records a single baseline row; the next `migrate up` backfills available files up
+to V before applying pending migrations.
+
 ### Use custom migration table
 
 By default, wrench uses `SchemaMigrations` table to manage migration versions. You can specify a custom table name using `--migration_table_name` flag:
