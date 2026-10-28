@@ -29,6 +29,7 @@ func TestMigrateUpSelection(t *testing.T) {
 		{name: "only", only: "42", setOnly: true, limit: -1, version: 42, wantOnly: true},
 		{name: "only with count", args: []string{"2"}, only: "42", setOnly: true, wantErr: "--only cannot be used with a migration count"},
 		{name: "invalid only", only: "abc", setOnly: true, wantErr: "invalid migration version"},
+		{name: "out of range only", only: "9223372036854775808", setOnly: true, wantErr: "invalid migration version"},
 		{name: "zero only", only: "0", setOnly: true, limit: -1, version: 0, wantOnly: true},
 	}
 	for _, test := range tests {

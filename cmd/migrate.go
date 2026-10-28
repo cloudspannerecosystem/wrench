@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -190,14 +191,11 @@ func migrateUpSelection(c *cobra.Command, args []string) (int, uint, bool, error
 		if err != nil {
 			return 0, 0, false, err
 		}
-		version, err := strconv.ParseUint(value, 10, 63)
+		version, err := parseSpannerMigrationVersion(value)
 		if err != nil {
-			return 0, 0, false, fmt.Errorf("invalid migration version %q: must be a nonnegative Spanner INT64", value)
+			return 0, 0, false, err
 		}
-		if version > uint64(^uint(0)) {
-			return 0, 0, false, fmt.Errorf("migration version %q exceeds supported range", value)
-		}
-		return -1, uint(version), true, nil
+		return -1, version, true, nil
 	}
 
 	limit := -1
@@ -209,6 +207,14 @@ func migrateUpSelection(c *cobra.Command, args []string) (int, uint, bool, error
 		limit = n
 	}
 	return limit, 0, false, nil
+}
+
+func parseSpannerMigrationVersion(value string) (uint, error) {
+	version, err := strconv.ParseUint(value, 10, strconv.IntSize)
+	if err != nil || version > math.MaxInt64 {
+		return 0, fmt.Errorf("invalid migration version %q: must be a nonnegative Spanner INT64", value)
+	}
+	return uint(version), nil
 }
 
 func migrateVersion(c *cobra.Command, _ []string) error {
@@ -268,15 +274,12 @@ func migrateSet(c *cobra.Command, args []string) error {
 			err: errors.New("parameters are not passed"),
 		}
 	}
-	version, err := strconv.ParseUint(args[0], 10, 63)
+	version, err := parseSpannerMigrationVersion(args[0])
 	if err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
 		}
-	}
-	if version > uint64(^uint(0)) {
-		return &Error{cmd: c, err: fmt.Errorf("migration version %d exceeds supported range", version)}
 	}
 
 	migrationTableName, err := getMigrationTableName(c)
@@ -305,7 +308,7 @@ func migrateSet(c *cobra.Command, args []string) error {
 	}
 
 	if c.Flag(flagNameDirectory).Value.String() == "" {
-		if err := client.SetMigrationBaseline(ctx, uint(version), migrationTableName); err != nil {
+		if err := client.SetMigrationBaseline(ctx, version, migrationTableName); err != nil {
 			return &Error{cmd: c, err: err}
 		}
 		return nil
@@ -316,7 +319,7 @@ func migrateSet(c *cobra.Command, args []string) error {
 	if err != nil {
 		return &Error{cmd: c, err: err}
 	}
-	if err := client.ResetMigrationHistory(ctx, migrations, uint(version), migrationTableName); err != nil {
+	if err := client.ResetMigrationHistory(ctx, migrations, version, migrationTableName); err != nil {
 		return &Error{
 			cmd: c,
 			err: err,
