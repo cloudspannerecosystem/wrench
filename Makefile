@@ -1,6 +1,5 @@
 BINDIR ?= bin
 
-export SPANNER_EMULATOR_HOST := localhost:9010
 SPANNER_EMULATOR_HOST_REST := localhost:9020
 
 export SPANNER_PROJECT_ID ?= wrench-test-project
@@ -8,7 +7,7 @@ export SPANNER_INSTANCE_ID ?= wrench-test-instance
 
 .PHONY: test
 test:
-	go test -race -v ./...
+	go test -count=1 -race -v ./...
 
 .PHONY: dep
 dep:
