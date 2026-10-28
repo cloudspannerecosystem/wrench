@@ -147,7 +147,11 @@ func migrateUp(c *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			c.PrintErrf("failed to close Spanner client: %v\n", err)
+		}
+	}()
 
 	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
 		return &Error{
@@ -196,7 +200,11 @@ func migrateVersion(c *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			c.PrintErrf("failed to close Spanner client: %v\n", err)
+		}
+	}()
 
 	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
 		return &Error{
@@ -230,7 +238,7 @@ func migrateSet(c *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return &Error{
 			cmd: c,
-			err: errors.New("Parameters are not passed."),
+			err: errors.New("parameters are not passed"),
 		}
 	}
 	version, err := strconv.Atoi(args[0])
@@ -253,7 +261,11 @@ func migrateSet(c *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			c.PrintErrf("failed to close Spanner client: %v\n", err)
+		}
+	}()
 
 	if err = client.EnsureMigrationTable(ctx, migrationTableName); err != nil {
 		return &Error{
@@ -274,7 +286,7 @@ func migrateSet(c *cobra.Command, args []string) error {
 
 func createMigrationFile(ctx context.Context, dir string, name string, digits int) (string, error) {
 	if name != "" && !spanner.MigrationNameRegex.MatchString(name) {
-		return "", errors.New("Invalid migration file name.")
+		return "", errors.New("invalid migration file name")
 	}
 
 	ms, err := spanner.ReadMigrations(ctx, dir)
@@ -304,7 +316,9 @@ func createMigrationFile(ctx context.Context, dir string, name string, digits in
 	if err != nil {
 		return "", err
 	}
-	fp.Close()
+	if err := fp.Close(); err != nil {
+		return "", err
+	}
 
 	return filename, nil
 }

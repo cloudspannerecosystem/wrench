@@ -87,7 +87,7 @@ func TestLoadDDL(t *testing.T) {
 	}
 
 	// Proto descriptors should be empty for a basic schema
-	if gotProtoDescriptors != nil && len(gotProtoDescriptors) > 0 {
+	if len(gotProtoDescriptors) > 0 {
 		t.Errorf("expected empty proto descriptors for basic schema, got %d bytes", len(gotProtoDescriptors))
 	}
 }
@@ -644,7 +644,9 @@ func TestCreateDatabase(t *testing.T) {
 			}
 
 			// Verify database was created successfully by checking if we can connect
-			client.Close()
+			if err := client.Close(); err != nil {
+				t.Fatalf("failed to close spanner client before reconnecting: %v", err)
+			}
 			client, err = NewClient(ctx, config)
 			if err != nil {
 				t.Fatalf("failed to reconnect to created database: %v", err)
@@ -674,7 +676,9 @@ func TestCreateDatabase(t *testing.T) {
 			}
 
 			// Clean up
-			client.Close()
+			if err := client.Close(); err != nil {
+				t.Errorf("failed to close spanner client: %v", err)
+			}
 		})
 	}
 }
@@ -722,14 +726,20 @@ func testClientWithDatabase(t *testing.T, ctx context.Context) (*Client, func())
 
 	// Spanner emulator is unstable when using a connection before creating a database.
 	// So recreate a wrench client for reconnecting the emulator.
-	client.Close()
+	if err := client.Close(); err != nil {
+		t.Fatalf("failed to close spanner client before reconnecting: %v", err)
+	}
 	client, err = NewClient(ctx, config)
 	if err != nil {
 		t.Fatalf("failed to create spanner client: %v", err)
 	}
 
 	return client, func() {
-		defer client.Close()
+		defer func() {
+			if err := client.Close(); err != nil {
+				t.Errorf("failed to close spanner client: %v", err)
+			}
+		}()
 
 		if err := client.DropDatabase(ctx); err != nil {
 			t.Fatalf("failed to delete database: %v", err)
@@ -814,13 +824,19 @@ func TestNewClientWithEmulatorHostConfig(t *testing.T) {
 
 	// Spanner emulator is unstable when using a connection before creating a database.
 	// So recreate a wrench client for reconnecting the emulator.
-	client.Close()
+	if err := client.Close(); err != nil {
+		t.Fatalf("failed to close spanner client before reconnecting: %v", err)
+	}
 	client, err = NewClient(ctx, config)
 	if err != nil {
 		t.Fatalf("failed to create spanner client: %v", err)
 	}
 	defer func() {
-		defer client.Close()
+		defer func() {
+			if err := client.Close(); err != nil {
+				t.Errorf("failed to close spanner client: %v", err)
+			}
+		}()
 
 		if err := client.DropDatabase(ctx); err != nil {
 			t.Fatalf("failed to delete database: %v", err)

@@ -79,22 +79,23 @@ func NewClient(ctx context.Context, config *Config) (*Client, error) {
 		// The emulator takes no credentials, so CredentialsFile is ignored.
 		opts = append(opts, emulatorClientOptions(config.EmulatorHost)...)
 	case config.CredentialsFile != "":
-		opts = append(opts, option.WithCredentialsFile(config.CredentialsFile))
+		credentialsOption, err := credentialsClientOption(config)
+		if err != nil {
+			return nil, &Error{
+				Code: ErrorCodeCreateClient,
+				err:  fmt.Errorf("invalid credentials configuration: %w", err),
+			}
+		}
+		if credentialsOption != nil {
+			opts = append(opts, credentialsOption)
+		}
 	}
 
-	spannerClient, err := spanner.NewClientWithConfig(ctx, config.URL(),
-		spanner.ClientConfig{
-			SessionPoolConfig: spanner.SessionPoolConfig{
-				MaxOpened:                         spanner.DefaultSessionPoolConfig.MaxOpened,
-				MinOpened:                         1,
-				MaxIdle:                           spanner.DefaultSessionPoolConfig.MaxIdle,
-				HealthCheckWorkers:                spanner.DefaultSessionPoolConfig.HealthCheckWorkers,
-				HealthCheckInterval:               spanner.DefaultSessionPoolConfig.HealthCheckInterval,
-				TrackSessionHandles:               false,
-				InactiveTransactionRemovalOptions: spanner.DefaultSessionPoolConfig.InactiveTransactionRemovalOptions,
-			},
-		},
-		opts...)
+	// Wrench previously passed SessionPoolConfig to NewClientWithConfig. The Spanner client
+	// removed its session pool, so it ignores every value except MultiplexSessionCheckInterval;
+	// SessionPoolConfig is deprecated. Wrench never set that interval, so NewClient preserves the
+	// same 10-minute default.
+	spannerClient, err := spanner.NewClient(ctx, config.URL(), opts...)
 	if err != nil {
 		return nil, &Error{
 			Code: ErrorCodeCreateClient,

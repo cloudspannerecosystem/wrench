@@ -30,6 +30,9 @@ type Config struct {
 	Instance        string
 	Database        string
 	CredentialsFile string
+	// CredentialsType identifies the JSON format in CredentialsFile. Empty uses
+	// option.ServiceAccount. Wrench accepts service_account and authorized_user.
+	CredentialsType option.CredentialsType
 
 	// EmulatorHost is the host and port of a Cloud Spanner emulator to connect
 	// to (e.g. "localhost:9010"). When set, wrench connects to the emulator

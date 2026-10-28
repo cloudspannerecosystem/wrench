@@ -44,6 +44,7 @@ var (
 	directory       string
 	schemaFile      string
 	credentialsFile string
+	credentialsType string
 	timeout         time.Duration
 	waitLongRunning bool
 )
@@ -93,6 +94,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&directory, flagNameDirectory, "", "Directory that schema file placed (required)")
 	rootCmd.PersistentFlags().StringVar(&schemaFile, flagNameSchemaFile, "", "Name of schema file (optional. if not set, will use default 'schema.sql' file name)")
 	rootCmd.PersistentFlags().StringVar(&credentialsFile, flagCredentialsFile, "", "Specify Credentials File")
+	rootCmd.PersistentFlags().StringVar(&credentialsType, flagCredentialsType, defaultCredentialsType, "Credentials file type: service_account (default) or authorized_user")
 	rootCmd.PersistentFlags().DurationVar(&timeout, flagTimeout, time.Hour, "Context timeout")
 	rootCmd.PersistentFlags().BoolVar(&waitLongRunning, flagWaitLongRunning, false, "Wait for long-running DDL operations to complete regardless of --timeout (the timeout still applies to submitting each request)")
 

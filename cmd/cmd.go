@@ -26,6 +26,7 @@ import (
 	"regexp"
 
 	"github.com/spf13/cobra"
+	"google.golang.org/api/option"
 
 	"github.com/cloudspannerecosystem/wrench/pkg/spanner"
 )
@@ -36,6 +37,7 @@ const (
 	flagNameDatabase        = "database"
 	flagNameDirectory       = "directory"
 	flagCredentialsFile     = "credentials_file"
+	flagCredentialsType     = "credentials_type"
 	flagNameSchemaFile      = "schema_file"
 	flagDDLFile             = "ddl"
 	flagDMLFile             = "dml"
@@ -47,6 +49,7 @@ const (
 	flagProtoDescriptorFile = "proto_descriptor_file"
 	flagMigrationTableName  = "migration_table_name"
 	defaultSchemaFileName   = "schema.sql"
+	defaultCredentialsType  = "service_account"
 
 	defaultMigrationTableName = "SchemaMigrations"
 )
@@ -61,6 +64,7 @@ func newSpannerClient(ctx context.Context, c *cobra.Command) (*spanner.Client, e
 		Instance:        c.Flag(flagNameInstance).Value.String(),
 		Database:        c.Flag(flagNameDatabase).Value.String(),
 		CredentialsFile: c.Flag(flagCredentialsFile).Value.String(),
+		CredentialsType: option.CredentialsType(c.Flag(flagCredentialsType).Value.String()),
 		WaitLongRunning: waitLongRunning,
 	}
 
@@ -81,6 +85,7 @@ func newSpannerAdminClient(ctx context.Context, c *cobra.Command) (*spanner.Admi
 		Instance:        c.Flag(flagNameInstance).Value.String(),
 		Database:        c.Flag(flagNameDatabase).Value.String(),
 		CredentialsFile: c.Flag(flagCredentialsFile).Value.String(),
+		CredentialsType: option.CredentialsType(c.Flag(flagCredentialsType).Value.String()),
 	}
 
 	client, err := spanner.NewAdminClient(ctx, config)
@@ -109,7 +114,7 @@ func getMigrationTableName(c *cobra.Command) (string, error) {
 	}
 
 	if !migrationTableNameRegex.MatchString(name) {
-		return "", fmt.Errorf("Invalid migration table name: %q. It must start with a letter and contain only letters, numbers and underscores (up to 128 characters).", name)
+		return "", fmt.Errorf("invalid migration table name %q; it must start with a letter and contain only letters, numbers and underscores (up to 128 characters)", name)
 	}
 
 	return name, nil
