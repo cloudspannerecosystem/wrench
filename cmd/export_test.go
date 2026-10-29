@@ -21,3 +21,5 @@ package cmd
 
 var CreateMigrationFile = createMigrationFile
 var GetMigrationTableName = getMigrationTableName
+var ConfirmDestructive = confirmDestructive
+var AddInteractiveFlag = addInteractiveFlag

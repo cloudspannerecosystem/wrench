@@ -31,7 +31,22 @@ var dropCmd = &cobra.Command{
 	RunE:  drop,
 }
 
+func init() {
+	addInteractiveFlag(dropCmd)
+}
+
 func drop(c *cobra.Command, _ []string) error {
+	if err := confirmDestructive(c, "drop"); err != nil {
+		return &Error{
+			err: err,
+			cmd: c,
+		}
+	}
+
+	return dropDatabase(c)
+}
+
+func dropDatabase(c *cobra.Command) error {
 	ctx, cancel := context.WithTimeout(c.Context(), timeout)
 	defer cancel()
 
