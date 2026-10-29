@@ -33,9 +33,17 @@ var truncateCmd = &cobra.Command{
 
 func init() {
 	truncateCmd.Flags().String(flagMigrationTableName, defaultMigrationTableName, "Name of the migration tracking table to be kept")
+	addInteractiveFlag(truncateCmd)
 }
 
 func truncate(c *cobra.Command, _ []string) error {
+	if err := confirmDestructive(c, "delete all data from"); err != nil {
+		return &Error{
+			err: err,
+			cmd: c,
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(c.Context(), timeout)
 	defer cancel()
 

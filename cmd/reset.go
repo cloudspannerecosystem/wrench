@@ -31,8 +31,19 @@ var resetCmd = &cobra.Command{
 	RunE:  reset,
 }
 
+func init() {
+	addInteractiveFlag(resetCmd)
+}
+
 func reset(c *cobra.Command, args []string) error {
-	if err := drop(c, args); err != nil {
+	if err := confirmDestructive(c, "drop and re-create"); err != nil {
+		return &Error{
+			err: err,
+			cmd: c,
+		}
+	}
+
+	if err := dropDatabase(c); err != nil {
 		return errorReset(c, err)
 	}
 

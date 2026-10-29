@@ -102,6 +102,9 @@ $ wrench drop
 
 This just drops the database.
 
+Pass `-i`/`--interactive` to be shown the target database and asked to confirm first.
+Without it, nothing is asked. `reset` and `truncate` accept the same flag.
+
 ### Reset database
 
 ```sh
